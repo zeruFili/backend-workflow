@@ -4,7 +4,7 @@
   "description": "Workflow Management System - Backend API",
   "main": "dist/app.js",
   "scripts": {
-    "dev": "ts-node -r tsconfig-paths/register src/app.ts",
+    "dev": "nodemon",
     "build": "tsc",
     "start": "node dist/app.js"
   },
@@ -30,6 +30,7 @@
     "@types/multer": "^1.4.12",
     "@types/node": "^22.10.0",
     "@types/uuid": "^10.0.0",
+    "nodemon": "^3.1.14",
     "ts-node": "^10.9.2",
     "tsconfig-paths": "^4.2.0",
     "typescript": "^5.7.2"
