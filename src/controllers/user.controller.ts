@@ -60,7 +60,7 @@ export class UserController {
   async create(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
       const dto = await validateDto(CreateUserDto, req.body);
-      const user = await userService.create({ ...dto, createdBy: req.user?.id || "" });
+      const user = await userService.create({ ...dto, createdBy: "8d6f0c9d-9c7d-4c4f-a1a9-5ef8f6b3d9aa" });
       res.status(201).json({ success: true, data: user, message: "User created successfully" });
     } catch (error) {
       next(error);
