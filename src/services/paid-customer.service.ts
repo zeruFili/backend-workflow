@@ -54,9 +54,9 @@ export class PaidCustomerService {
       n.user_id = user.id;
       n.from_user_id = fromUserId;
       n.resource_id = resourceId;
-      n.resource_type = resourceType;
+      n.resource_type = resourceType as any;
       n.parent_id = parentId;
-      n.parent_type = parentType;
+      n.parent_type = parentType as any;
       n.type = typeLabel;
       n.viewed = false;
       return n;

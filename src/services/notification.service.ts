@@ -1,5 +1,7 @@
 import { AppDataSource } from "../config/data-source";
 import { Notification } from "../entities/Notification";
+import { ResourceType } from "../enums/resource-type.enum";
+import { ParentType } from "../enums/parent-type.enum";
 import { AppError } from "../middlewares/error.middleware";
 
 export class NotificationService {
@@ -9,9 +11,9 @@ export class NotificationService {
     user_id: string;
     from_user_id: string;
     resource_id: string;
-    resource_type: string;
+    resource_type: ResourceType;
     parent_id: string;
-    parent_type?: string;
+    parent_type?: ParentType;
     type: string;
   }) {
     const notification = new Notification();

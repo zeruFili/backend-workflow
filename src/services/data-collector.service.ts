@@ -8,6 +8,8 @@ import { DataCollectorTaskStatus } from "../enums/data-collector-task-status.enu
 import { TaskState } from "../enums/task-state.enum";
 import { ReviewOutcome } from "../enums/review-outcome.enum";
 import { UserRole } from "../enums/user-role.enum";
+import { ResourceType } from "../enums/resource-type.enum";
+import { ParentType } from "../enums/parent-type.enum";
 import { AppError } from "../middlewares/error.middleware";
 
 interface PaginatedParams {
@@ -46,9 +48,9 @@ export class DataCollectorService {
     user_id: string;
     from_user_id: string;
     resource_id: string;
-    resource_type: string;
+    resource_type: ResourceType;
     parent_id: string;
-    parent_type: string;
+    parent_type: ParentType;
     type: string;
   }) {
     const n = new Notification();
@@ -129,9 +131,9 @@ export class DataCollectorService {
         user_id: saved.assigned_to_user_id,
         from_user_id: assignedByUserId,
         resource_id: saved.id,
-        resource_type: "task_assigned",
+        resource_type: ResourceType.TASK_ASSIGNED,
         parent_id: saved.id,
-        parent_type: "data_collector_task",
+        parent_type: ParentType.DATA_COLLECTOR_TASK,
         type: "New data collector task assigned",
       });
     }
@@ -181,9 +183,9 @@ export class DataCollectorService {
         user_id: user.id,
         from_user_id: userId,
         resource_id: saved.id,
-        resource_type: "submission",
+        resource_type: ResourceType.SUBMISSION,
         parent_id: taskId,
-        parent_type: "data_collector_task",
+        parent_type: ParentType.DATA_COLLECTOR_TASK,
         type: "New data collector submission",
       });
     }
@@ -236,9 +238,9 @@ export class DataCollectorService {
         user_id: task.assigned_to_user_id,
         from_user_id: reviewerUserId,
         resource_id: saved.id,
-        resource_type: "review",
+        resource_type: ResourceType.REVIEW,
         parent_id: task.id,
-        parent_type: "data_collector_task",
+        parent_type: ParentType.DATA_COLLECTOR_TASK,
         type: `Submission ${reviewOutcome}`,
       });
     }

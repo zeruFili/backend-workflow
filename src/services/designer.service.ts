@@ -12,6 +12,8 @@ import { ReviewOutcome } from "../enums/review-outcome.enum";
 import { TaskState } from "../enums/task-state.enum";
 import { DesignerStage } from "../enums/designer-stage.enum";
 import { UserRole } from "../enums/user-role.enum";
+import { ResourceType } from "../enums/resource-type.enum";
+import { ParentType } from "../enums/parent-type.enum";
 import { AppError } from "../middlewares/error.middleware";
 
 interface PaginatedParams {
@@ -75,9 +77,9 @@ export class DesignerService {
     user_id: string;
     from_user_id: string;
     resource_id: string;
-    resource_type: string;
+    resource_type: ResourceType;
     parent_id: string;
-    parent_type: string;
+    parent_type: ParentType;
     type: string;
   }) {
     const n = new Notification();
@@ -176,9 +178,9 @@ export class DesignerService {
           user_id: designer.id,
           from_user_id: assignedByUserId,
           resource_id: saved.id,
-          resource_type: "posted job",
+          resource_type: ResourceType.POSTED_JOB,
           parent_id: saved.id,
-          parent_type: "designer_task",
+          parent_type: ParentType.DESIGNER_TASK,
           type: "New public designer task available",
         });
       }
@@ -189,9 +191,9 @@ export class DesignerService {
         user_id: saved.assigned_to_user_id,
         from_user_id: assignedByUserId,
         resource_id: saved.id,
-        resource_type: "task_assigned",
+        resource_type: ResourceType.TASK_ASSIGNED,
         parent_id: saved.id,
-        parent_type: "designer_task",
+        parent_type: ParentType.DESIGNER_TASK,
         type: "You have been assigned to a new designer task",
       });
     }
@@ -245,9 +247,9 @@ export class DesignerService {
       user_id: designerUserId,
       from_user_id: assignedByUserId,
       resource_id: taskId,
-      resource_type: "task_assigned",
+      resource_type: ResourceType.TASK_ASSIGNED,
       parent_id: taskId,
-      parent_type: "designer_task",
+      parent_type: ParentType.DESIGNER_TASK,
       type: "You have been assigned to a designer task",
     });
 
@@ -292,9 +294,9 @@ export class DesignerService {
         user_id: reviewer.id,
         from_user_id: applicantUserId,
         resource_id: saved.id,
-        resource_type: "apply",
+        resource_type: ResourceType.APPLY,
         parent_id: taskId,
-        parent_type: "designer_task",
+        parent_type: ParentType.DESIGNER_TASK,
         type: "New designer application submitted",
       });
     }
@@ -360,9 +362,9 @@ export class DesignerService {
           user_id: application.applicant_user_id,
           from_user_id: reviewerUserId,
           resource_id: task.id,
-          resource_type: "task_assigned",
+          resource_type: ResourceType.TASK_ASSIGNED,
           parent_id: task.id,
-          parent_type: "designer_task",
+          parent_type: ParentType.DESIGNER_TASK,
           type: "Your application has been accepted",
         });
       }
@@ -374,9 +376,9 @@ export class DesignerService {
         user_id: application.applicant_user_id,
         from_user_id: reviewerUserId,
         resource_id: application.designer_task_id,
-        resource_type: "apply",
+        resource_type: ResourceType.APPLY,
         parent_id: application.designer_task_id,
-        parent_type: "designer_task",
+        parent_type: ParentType.DESIGNER_TASK,
         type: "Your application was not accepted",
       });
     }
@@ -446,9 +448,9 @@ export class DesignerService {
         user_id: reviewer.id,
         from_user_id: userId,
         resource_id: saved.id,
-        resource_type: "submission",
+        resource_type: ResourceType.SUBMISSION,
         parent_id: taskId,
-        parent_type: "designer_task",
+        parent_type: ParentType.DESIGNER_TASK,
         type: `Designer submission for stage "${resolvedStage}"`,
       });
     }
@@ -482,9 +484,9 @@ export class DesignerService {
         user_id: task.assigned_to_user_id,
         from_user_id: reviewerUserId,
         resource_id: saved.id,
-        resource_type: "review",
+        resource_type: ResourceType.REVIEW,
         parent_id: task.id,
-        parent_type: "designer_task",
+        parent_type: ParentType.DESIGNER_TASK,
         type: `Your submission was ${reviewOutcome}`,
       });
     }
@@ -525,9 +527,9 @@ export class DesignerService {
         user_id: task.assigned_to_user_id,
         from_user_id: reviewerUserId,
         resource_id: saved.id,
-        resource_type: "rate",
+        resource_type: ResourceType.RATE,
         parent_id: taskId,
-        parent_type: "designer_task",
+        parent_type: ParentType.DESIGNER_TASK,
         type: "Your task has received a final evaluation",
       });
     }
@@ -577,9 +579,9 @@ export class DesignerService {
         user_id: task.assigned_to_user_id,
         from_user_id: userId,
         resource_id: taskId,
-        resource_type: "paused",
+        resource_type: ResourceType.PAUSED,
         parent_id: taskId,
-        parent_type: "designer_task",
+        parent_type: ParentType.DESIGNER_TASK,
         type: `Task paused: ${reason}`,
       });
     }
@@ -613,9 +615,9 @@ export class DesignerService {
         user_id: task.assigned_to_user_id,
         from_user_id: userId,
         resource_id: taskId,
-        resource_type: "paused",
+        resource_type: ResourceType.PAUSED,
         parent_id: taskId,
-        parent_type: "designer_task",
+        parent_type: ParentType.DESIGNER_TASK,
         type: "Task resumed",
       });
     }

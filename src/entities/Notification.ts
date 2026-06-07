@@ -3,6 +3,8 @@ import {
   ManyToOne, JoinColumn, Index,
 } from "typeorm";
 import { User } from "./User";
+import { ResourceType } from "../enums/resource-type.enum";
+import { ParentType } from "../enums/parent-type.enum";
 
 @Entity("notification")
 @Index("idx_notif_user_parent", ["user_id", "parent_id", "viewed"])
@@ -31,13 +33,13 @@ export class Notification {
   resource_id: string;
 
   @Column({ type: "varchar", length: 50 })
-  resource_type: string;
+  resource_type: ResourceType;
 
   @Column({ type: "uuid" })
   parent_id: string;
 
   @Column({ type: "varchar", length: 50, nullable: true })
-  parent_type: string;
+  parent_type: ParentType;
 
   @Column({ type: "varchar", length: 255 })
   type: string;
