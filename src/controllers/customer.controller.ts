@@ -3,10 +3,8 @@ import { validate } from "class-validator";
 import { plainToInstance } from "class-transformer";
 import { AuthRequest } from "../middlewares/auth.middleware";
 import { AppError } from "../middlewares/error.middleware";
-import { paidCustomerService } from "../services/paid-customer.service";
-import { CreatePaidCustomerDto, VerifyPaidCustomerDto } from "../validators/paid-customer.dto";
-import path from "path";
-import fs from "fs";
+import { customerService } from "../services/customer.service";
+import { CreateCustomerDto, UpdateCustomerDto } from "../validators/customer.dto";
 
 async function validateDto<T extends object>(dtoClass: new () => T, plain: object): Promise<T> {
   const instance = plainToInstance(dtoClass, plain);
@@ -26,33 +24,13 @@ async function validateDto<T extends object>(dtoClass: new () => T, plain: objec
   return instance;
 }
 
-function ensureUploadsDir(): string {
-  const dir = path.resolve(process.cwd(), "uploads", "paid_customer_attachments");
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-  }
-  return dir;
-}
-
-function extractAttachmentUrls(req: AuthRequest): string[] {
-  const files = (req as any).files as Express.Multer.File[] | undefined;
-  if (!files || files.length === 0) return [];
-
-  const uploadDir = ensureUploadsDir();
-
-  return files.map((file) => {
-    const destPath = path.join(uploadDir, `${Date.now()}-${file.originalname}`);
-    fs.writeFileSync(destPath, file.buffer);
-    return destPath;
-  });
-}
-
-export class PaidCustomerController {
+export class CustomerController {
   async findAll(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
       const page = Math.max(1, parseInt(req.query.page as string) || 1);
       const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 20));
-      const status = req.query.status as string | undefined;
+      const category = req.query.category as string | undefined;
+      const paid = req.query.paid !== undefined ? req.query.paid === "true" : undefined;
       const search = req.query.search as string | undefined;
 
       if (!req.user) {
@@ -60,11 +38,14 @@ export class PaidCustomerController {
         return;
       }
 
-      const result = await paidCustomerService.findAll({
+      const result = await customerService.findAll({
         page,
         limit,
-        status,
+        category,
+        paid,
         search,
+        userId: req.user.id,
+        userRole: req.user.role,
       });
 
       res.status(200).json({ success: true, ...result });
@@ -77,7 +58,7 @@ export class PaidCustomerController {
     try {
       const id = req.params.id as string;
 
-      const result = await paidCustomerService.findById(id);
+      const result = await customerService.findById(id);
       res.status(200).json({ success: true, data: result });
     } catch (error) {
       next(error);
@@ -86,54 +67,72 @@ export class PaidCustomerController {
 
   async create(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
-      const dto = await validateDto(CreatePaidCustomerDto, req.body);
+      const dto = await validateDto(CreateCustomerDto, req.body);
 
       if (!req.user) {
         res.status(401).json({ success: false, message: "Unauthorized" });
         return;
       }
 
-      const attachmentUrls = extractAttachmentUrls(req);
+      const result = await customerService.create(dto, req.user.id);
 
-      const result = await paidCustomerService.create({
-        ...dto,
-        attachment_urls: attachmentUrls.length > 0 ? attachmentUrls : undefined,
-      }, req.user.id);
-
-      res.status(201).json({ success: true, data: result, message: "Paid customer created" });
+      res.status(201).json({ success: true, data: result, message: "Customer created" });
     } catch (error) {
       next(error);
     }
   }
 
-  async verify(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+  async update(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
       const id = req.params.id as string;
-      const dto = await validateDto(VerifyPaidCustomerDto, req.body);
+      const dto = await validateDto(UpdateCustomerDto, req.body);
 
       if (!req.user) {
         res.status(401).json({ success: false, message: "Unauthorized" });
         return;
       }
 
-      const result = await paidCustomerService.verify(id, dto, req.user.id);
+      const result = await customerService.update(id, dto, req.user.id, req.user.role);
 
-      res.status(200).json({ success: true, data: result, message: `Payment ${dto.review_outcome}` });
-    } catch (error) {
-      next(error);
-    }
-  }
-
-  async getVerificationHistory(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
-    try {
-      const id = req.params.id as string;
-
-      const result = await paidCustomerService.getVerificationHistory(id);
       res.status(200).json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async markAsPaid(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const id = req.params.id as string;
+
+      if (!req.user) {
+        res.status(401).json({ success: false, message: "Unauthorized" });
+        return;
+      }
+
+      const result = await customerService.markAsPaid(id, req.user.id, req.user.role);
+
+      res.status(200).json({ success: true, data: result, message: "Customer marked as paid" });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async delete(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const id = req.params.id as string;
+
+      if (!req.user) {
+        res.status(401).json({ success: false, message: "Unauthorized" });
+        return;
+      }
+
+      await customerService.delete(id, req.user.id, req.user.role);
+
+      res.status(200).json({ success: true, message: "Customer deleted" });
     } catch (error) {
       next(error);
     }
   }
 }
 
-export const paidCustomerController = new PaidCustomerController();
+export const customerController = new CustomerController();

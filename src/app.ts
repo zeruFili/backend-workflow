@@ -11,16 +11,11 @@ import { errorHandler, notFound } from "./middlewares/error.middleware";
 
 import authRoutes from "./routes/auth.routes";
 import userRoutes from "./routes/user.routes";
-import projectRoutes from "./routes/project.routes";
-import taskRoutes from "./routes/task.routes";
-import customerRequestRoutes from "./routes/customer-request.routes";
 import paidCustomerRoutes from "./routes/paid-customer.routes";
-import designerTaskRoutes from "./routes/designer-task.routes";
-import designerApplicationRoutes from "./routes/designer-application.routes";
-import designerRatingRoutes from "./routes/designer-rating.routes";
 import qsRoutes from "./routes/qs.routes";
 import notificationRoutes from "./routes/notification.routes";
-import dashboardRoutes from "./routes/dashboard.routes";
+import dataCollectorRoutes from "./routes/data-collector.routes";
+import designerRoutes from "./routes/designer.routes";
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -33,16 +28,11 @@ app.use("/uploads", express.static(path.join(__dirname, "..", "uploads")));
 
 app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/users", userRoutes);
-app.use("/api/v1/projects", projectRoutes);
-app.use("/api/v1/tasks", taskRoutes);
-app.use("/api/v1/customer-requests", customerRequestRoutes);
 app.use("/api/v1/paid-customers", paidCustomerRoutes);
-app.use("/api/v1/designer-tasks", designerTaskRoutes);
-app.use("/api/v1/designer-task-applications", designerApplicationRoutes);
-app.use("/api/v1/designer-ratings", designerRatingRoutes);
 app.use("/api/v1", qsRoutes);
 app.use("/api/v1", notificationRoutes);
-app.use("/api/v1", dashboardRoutes);
+app.use("/api/v1", dataCollectorRoutes);
+app.use("/api/v1", designerRoutes);
 
 app.use(notFound);
 app.use(errorHandler);

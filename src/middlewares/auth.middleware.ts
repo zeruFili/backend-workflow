@@ -6,8 +6,8 @@ export interface AuthRequest extends Request {
   user?: {
     id: string;
     role: UserRole;
-    username: string;
-    name: string;
+    email: string;
+    full_name: string;
   };
 }
 
@@ -24,14 +24,14 @@ export function authenticate(req: AuthRequest, res: Response, next: NextFunction
     const decoded = jwt.verify(token, secret) as {
       sub: string;
       role: UserRole;
-      username: string;
-      name: string;
+      email: string;
+      full_name: string;
     };
     req.user = {
       id: decoded.sub,
       role: decoded.role,
-      username: decoded.username,
-      name: decoded.name,
+      email: decoded.email,
+      full_name: decoded.full_name,
     };
     next();
   } catch {

@@ -2,27 +2,23 @@ import {
   Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn,
   ManyToOne, JoinColumn, Index,
 } from "typeorm";
-import { Customer } from "./Customer";
-import { ReviewOutcome } from "../enums/review-outcome.enum";
+import { PaidCustomer } from "./PaidCustomer";
 
-@Entity("paid_customer")
-@Index("idx_paid_customer_customer_status", ["customer_id", "status"])
-export class PaidCustomer {
+@Entity("marketing_submission")
+@Index("idx_marketing_submission_paid_customer_created_at", ["paid_customer_id", "created_at"])
+export class MarketingSubmission {
   @PrimaryGeneratedColumn("uuid")
   id: string;
 
   @Column({ type: "uuid" })
-  customer_id: string;
+  paid_customer_id: string;
 
-  @ManyToOne(() => Customer)
-  @JoinColumn({ name: "customer_id" })
-  customer: Customer;
+  @ManyToOne(() => PaidCustomer, { onDelete: "CASCADE" })
+  @JoinColumn({ name: "paid_customer_id" })
+  paid_customer: PaidCustomer;
 
   @Column({ type: "text" })
   description: string;
-
-  @Column({ type: "enum", enum: ReviewOutcome, default: ReviewOutcome.PENDING })
-  status: ReviewOutcome;
 
   @Column({ type: "text", array: true, nullable: true })
   attachment_urls: string[];

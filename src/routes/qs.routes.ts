@@ -1,21 +1,17 @@
 import { Router } from "express";
-import { qsController } from "../controllers/qs.controller";
 import { authenticate, authorize } from "../middlewares/auth.middleware";
 import { UserRole } from "../enums/user-role.enum";
+import { quantitySurveyorController } from "../controllers/qs.controller";
 
 const router = Router();
 
-router.get("/qs-review-tasks", authenticate, (req, res) => qsController.findAllReviewTasks(req, res));
-router.post("/qs-review-tasks", authenticate, authorize(UserRole.CEO, UserRole.GENERAL_MANAGER), (req, res) => qsController.createReviewTask(req, res));
-router.patch("/qs-review-tasks/:id/status", authenticate, authorize(UserRole.QUANTITY_SURVEYOR), (req, res) => qsController.updateTaskStatus(req, res));
-router.patch("/qs-review-tasks/:id/assign", authenticate, authorize(UserRole.CEO, UserRole.GENERAL_MANAGER), (req, res) => qsController.assignTask(req, res));
-
-router.get("/qs-evaluations", authenticate, (req, res) => qsController.findEvaluations(req, res));
-router.post("/qs-evaluations", authenticate, authorize(UserRole.QUANTITY_SURVEYOR), (req, res) => qsController.createEvaluation(req, res));
-router.put("/qs-evaluations/:id", authenticate, authorize(UserRole.QUANTITY_SURVEYOR), (req, res) => qsController.updateEvaluation(req, res));
-router.post("/qs-evaluations/:id/decide", authenticate, authorize(UserRole.CEO, UserRole.GENERAL_MANAGER), (req, res) => qsController.decide(req, res));
-
-router.get("/qs-notifications", authenticate, (req, res) => qsController.getNotifications(req, res));
-router.patch("/qs-notifications/read-all", authenticate, (req, res) => qsController.markNotificationsRead(req, res));
+router.get("/qs-tasks", authenticate, (req, res, next) => quantitySurveyorController.findAllTasks(req, res, next));
+router.post("/qs-tasks", authenticate, authorize(UserRole.CEO, UserRole.GENERAL_MANAGER), (req, res, next) => quantitySurveyorController.createTask(req, res, next));
+router.get("/qs-tasks/:id", authenticate, (req, res, next) => quantitySurveyorController.findTaskById(req, res, next));
+router.patch("/qs-tasks/:id", authenticate, authorize(UserRole.CEO, UserRole.GENERAL_MANAGER), (req, res, next) => quantitySurveyorController.updateTask(req, res, next));
+router.get("/qs-tasks/:id/submissions", authenticate, (req, res, next) => quantitySurveyorController.getSubmissions(req, res, next));
+router.post("/qs-tasks/:id/submissions", authenticate, authorize(UserRole.QUANTITY_SURVEYOR), (req, res, next) => quantitySurveyorController.createSubmission(req, res, next));
+router.get("/qs-submissions/:id/reviews", authenticate, (req, res, next) => quantitySurveyorController.getReviews(req, res, next));
+router.post("/qs-submissions/:id/review", authenticate, authorize(UserRole.CEO, UserRole.GENERAL_MANAGER), (req, res, next) => quantitySurveyorController.createReview(req, res, next));
 
 export default router;

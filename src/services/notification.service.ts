@@ -1,172 +1,77 @@
 import { AppDataSource } from "../config/data-source";
 import { Notification } from "../entities/Notification";
-import { User } from "../entities/User";
-import { NotificationType } from "../enums/notification-type.enum";
-import { UserRole } from "../enums/user-role.enum";
 import { AppError } from "../middlewares/error.middleware";
-import { In } from "typeorm";
-
-const notificationRepo = () => AppDataSource.getRepository(Notification);
-const userRepo = () => AppDataSource.getRepository(User);
 
 export class NotificationService {
-  async getUserNotifications(params: {
-    page: number;
-    limit: number;
-    isRead?: boolean;
-    type?: string;
-    entityType?: string;
-    sort?: string;
-    currentUser: { id: string };
+  private repo = AppDataSource.getRepository(Notification);
+
+  async createNotification(params: {
+    user_id: string;
+    from_user_id: string;
+    resource_id: string;
+    resource_type: string;
+    parent_id: string;
+    parent_type?: string;
+    type: string;
   }) {
-    const { page, limit, isRead, type, entityType, sort, currentUser } = params;
+    const notification = new Notification();
+    notification.user_id = params.user_id;
+    notification.from_user_id = params.from_user_id;
+    notification.resource_id = params.resource_id;
+    notification.resource_type = params.resource_type;
+    notification.parent_id = params.parent_id;
+    notification.parent_type = params.parent_type ?? null as any;
+    notification.type = params.type;
+    notification.viewed = false;
 
-    const qb = notificationRepo().createQueryBuilder("n")
-      .where("n.user_id = :userId", { userId: currentUser.id });
+    return this.repo.save(notification);
+  }
 
-    if (isRead !== undefined) {
-      qb.andWhere("n.is_read = :isRead", { isRead });
-    }
-
-    if (type) {
-      qb.andWhere("n.type = :type", { type });
-    }
-
-    if (entityType) {
-      qb.andWhere("n.entity_type = :entityType", { entityType });
-    }
-
-    const allowedSortFields = ["created_at", "type", "is_read"];
-    if (sort && allowedSortFields.includes(sort.replace("-", ""))) {
-      const direction = sort.startsWith("-") ? "DESC" : "ASC";
-      const field = sort.replace("-", "");
-      qb.orderBy(`n.${field}`, direction);
-    } else {
-      qb.orderBy("n.created_at", "DESC");
-    }
-
+  async getUserNotifications(userId: string, page: number, limit: number) {
     const skip = (page - 1) * limit;
-    const [data, total] = await qb.skip(skip).take(limit).getManyAndCount();
 
-    const unreadCount = await notificationRepo().count({
-      where: { user_id: currentUser.id, is_read: false },
+    const [data, total] = await this.repo.findAndCount({
+      where: { user_id: userId } as any,
+      relations: ["from_user"],
+      order: { created_at: "DESC" },
+      skip,
+      take: limit,
     });
 
     return {
       data,
-      unreadCount,
-      total,
-      page,
-      limit,
-      totalPages: Math.ceil(total / limit),
+      meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
     };
   }
 
-  async markRead(notificationId: string, currentUser: { id: string }) {
-    const notification = await notificationRepo().findOne({
-      where: { id: notificationId, user_id: currentUser.id },
+  async getUnreadCount(userId: string) {
+    const count = await this.repo.count({
+      where: { user_id: userId as any, viewed: false },
+    });
+
+    return { total: count };
+  }
+
+  async markRead(notificationId: string, userId: string) {
+    const notification = await this.repo.findOne({
+      where: { id: notificationId, user_id: userId } as any,
     });
 
     if (!notification) {
       throw new AppError(404, "Notification not found");
     }
 
-    notification.is_read = true;
-    notification.read_at = new Date();
-
-    return notificationRepo().save(notification);
+    notification.viewed = true;
+    return this.repo.save(notification);
   }
 
-  async markAllRead(params: {
-    types?: string[];
-    currentUser: { id: string };
-  }) {
-    const { types, currentUser } = params;
+  async markAllRead(userId: string) {
+    const result = await this.repo.update(
+      { user_id: userId as any, viewed: false },
+      { viewed: true }
+    );
 
-    const where: any = { user_id: currentUser.id, is_read: false };
-
-    if (types && types.length > 0) {
-      where.type = In(types);
-    }
-
-    const unreadNotifications = await notificationRepo().find({ where });
-    const count = unreadNotifications.length;
-
-    if (count > 0) {
-      const now = new Date();
-      for (const n of unreadNotifications) {
-        n.is_read = true;
-        n.read_at = now;
-      }
-      await notificationRepo().save(unreadNotifications);
-    }
-
-    return { markedCount: count };
-  }
-
-  async getUnreadCount(params: {
-    currentUser: { id: string };
-  }) {
-    const { currentUser } = params;
-
-    const total = await notificationRepo().count({
-      where: { user_id: currentUser.id, is_read: false },
-    });
-
-    const rawByType = await notificationRepo()
-      .createQueryBuilder("n")
-      .select("n.type", "type")
-      .addSelect("COUNT(n.id)", "count")
-      .where("n.user_id = :userId", { userId: currentUser.id })
-      .andWhere("n.is_read = false")
-      .groupBy("n.type")
-      .getRawMany<{ type: string; count: string }>();
-
-    const byType: Record<string, number> = {};
-    for (const row of rawByType) {
-      byType[row.type] = parseInt(row.count, 10);
-    }
-
-    return { total, byType };
-  }
-
-  async createNotification(params: {
-    userIds?: string[];
-    role?: UserRole;
-    type: NotificationType;
-    title: string;
-    body?: string;
-    entityType?: string;
-    entityId?: string;
-  }) {
-    let userIds: string[] = params.userIds ?? [];
-
-    if (!userIds.length && params.role) {
-      const users = await userRepo().find({
-        where: { role: params.role, is_active: true },
-        select: ["id"],
-      });
-      userIds = users.map((u) => u.id);
-    }
-
-    const notifications: Notification[] = [];
-    for (const userId of userIds) {
-      const notif = new Notification();
-      notif.user_id = userId;
-      notif.type = params.type;
-      notif.title = params.title;
-      notif.body = params.body ?? null;
-      notif.entity_type = params.entityType ?? null;
-      notif.entity_id = params.entityId ?? null;
-      notif.is_read = false;
-      notifications.push(notif);
-    }
-
-    if (notifications.length > 0) {
-      return notificationRepo().save(notifications);
-    }
-
-    return [];
+    return { markedCount: result.affected ?? 0 };
   }
 }
 

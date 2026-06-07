@@ -1,23 +1,12 @@
-import { FindOptionsWhere, ILike, In } from "typeorm";
+import { FindOptionsWhere, ILike } from "typeorm";
 import bcrypt from "bcryptjs";
 import { AppDataSource } from "../config/data-source";
 import { User } from "../entities/User";
-import { RefreshToken } from "../entities/RefreshToken";
 import { UserRole } from "../enums/user-role.enum";
 import { AppError } from "../middlewares/error.middleware";
 
-interface UserFilters {
-  page?: number;
-  limit?: number;
-  username?: string;
-  name?: string;
-  email?: string;
-  role?: UserRole;
-  is_active?: boolean;
-}
-
-interface PaginatedUsers {
-  data: Partial<User>[];
+interface PaginatedResult<T> {
+  data: T[];
   meta: {
     total: number;
     page: number;
@@ -27,16 +16,16 @@ interface PaginatedUsers {
 }
 
 interface CreateUserInput {
-  username: string;
-  name: string;
+  full_name: string;
   email: string;
   password: string;
   role: UserRole;
   phone?: string;
+  createdBy: string;
 }
 
 interface UpdateUserInput {
-  name?: string;
+  full_name?: string;
   email?: string;
   role?: UserRole;
   phone?: string;
@@ -44,8 +33,13 @@ interface UpdateUserInput {
   is_active?: boolean;
 }
 
+interface CurrentUser {
+  id: string;
+  role: UserRole;
+}
+
 const userRepo = () => AppDataSource.getRepository(User);
-const refreshTokenRepo = () => AppDataSource.getRepository(RefreshToken);
+const BCRYPT_COST = 12;
 
 function sanitizeUser(user: User): Partial<User> {
   const { password_hash, ...rest } = user;
@@ -53,44 +47,49 @@ function sanitizeUser(user: User): Partial<User> {
 }
 
 export class UserService {
-  async findAll(filters: UserFilters): Promise<PaginatedUsers> {
-    const page = Math.max(1, filters.page || 1);
-    const limit = Math.min(100, Math.max(1, filters.limit || 20));
-    const where: FindOptionsWhere<User>[] = [];
-    const conditions: FindOptionsWhere<User> = {};
+  async findAll(
+    page: number = 1,
+    limit: number = 20,
+    role?: UserRole,
+    is_active?: boolean,
+    search?: string
+  ): Promise<PaginatedResult<Partial<User>>> {
+    const p = Math.max(1, page);
+    const l = Math.min(100, Math.max(1, limit));
+    const where: FindOptionsWhere<User> = {};
 
-    if (filters.username) {
-      conditions.username = ILike(`%${filters.username}%`);
+    if (role) {
+      where.role = role;
     }
-    if (filters.name) {
-      conditions.name = ILike(`%${filters.name}%`);
-    }
-    if (filters.email) {
-      conditions.email = ILike(`%${filters.email}%`);
-    }
-    if (filters.role) {
-      conditions.role = filters.role;
-    }
-    if (filters.is_active !== undefined) {
-      conditions.is_active = filters.is_active;
+    if (is_active !== undefined) {
+      where.is_active = is_active;
     }
 
-    where.push(conditions);
+    const whereConditions: FindOptionsWhere<User>[] = [];
+
+    if (search) {
+      whereConditions.push(
+        { ...where, email: ILike(`%${search}%`) },
+        { ...where, full_name: ILike(`%${search}%`) }
+      );
+    } else {
+      whereConditions.push(where);
+    }
 
     const [users, total] = await userRepo().findAndCount({
-      where,
+      where: whereConditions,
       order: { created_at: "DESC" },
-      skip: (page - 1) * limit,
-      take: limit,
+      skip: (p - 1) * l,
+      take: l,
     });
 
     return {
       data: users.map(sanitizeUser),
       meta: {
         total,
-        page,
-        limit,
-        totalPages: Math.ceil(total / limit),
+        page: p,
+        limit: l,
+        totalPages: Math.ceil(total / l),
       },
     };
   }
@@ -108,27 +107,21 @@ export class UserService {
       throw new AppError(400, "Cannot create a user with CEO role");
     }
 
-    const existingUsername = await userRepo().findOne({ where: { username: dto.username } });
-    if (existingUsername) {
-      throw new AppError(409, "Username already exists");
-    }
-
     const existingEmail = await userRepo().findOne({ where: { email: dto.email } });
     if (existingEmail) {
       throw new AppError(409, "Email already exists");
     }
 
-    const password_hash = await bcrypt.hash(dto.password, 12);
+    const password_hash = await bcrypt.hash(dto.password, BCRYPT_COST);
 
     const user = userRepo().create({
-      username: dto.username,
-      name: dto.name,
+      full_name: dto.full_name,
       email: dto.email,
       password_hash,
       role: dto.role,
-      phone: dto.phone,
-      force_password_change: true,
+      phone: (dto.phone || undefined) as any,
       is_active: true,
+      created_by: dto.createdBy,
     });
 
     const saved = await userRepo().save(user);
@@ -138,7 +131,7 @@ export class UserService {
   async update(
     id: string,
     dto: UpdateUserInput,
-    currentUser: { id: string; role: UserRole }
+    currentUser: CurrentUser
   ): Promise<Partial<User>> {
     const user = await userRepo().findOne({ where: { id } });
     if (!user) {
@@ -151,8 +144,8 @@ export class UserService {
       throw new AppError(403, "Cannot change your own role");
     }
 
-    if (dto.is_active !== undefined && isSelf) {
-      throw new AppError(403, "Cannot change your own active status");
+    if (dto.is_active === false && isSelf) {
+      throw new AppError(403, "Cannot deactivate your own account");
     }
 
     if (dto.email && dto.email !== user.email) {
@@ -163,8 +156,8 @@ export class UserService {
       user.email = dto.email;
     }
 
-    if (dto.name !== undefined) {
-      user.name = dto.name;
+    if (dto.full_name !== undefined) {
+      user.full_name = dto.full_name;
     }
 
     if (dto.role !== undefined) {
@@ -176,8 +169,7 @@ export class UserService {
     }
 
     if (dto.password) {
-      user.password_hash = await bcrypt.hash(dto.password, 12);
-      user.force_password_change = true;
+      user.password_hash = await bcrypt.hash(dto.password, BCRYPT_COST);
     }
 
     if (dto.is_active !== undefined) {
@@ -190,7 +182,7 @@ export class UserService {
 
   async softDelete(
     id: string,
-    currentUser: { id: string; role: UserRole }
+    currentUser: CurrentUser
   ): Promise<void> {
     if (id === currentUser.id) {
       throw new AppError(403, "Cannot delete your own account");
@@ -203,11 +195,6 @@ export class UserService {
 
     user.is_active = false;
     await userRepo().save(user);
-
-    await refreshTokenRepo().update(
-      { user_id: id, revoked: false },
-      { revoked: true }
-    );
   }
 }
 

@@ -28,30 +28,19 @@ async function validateDto<T extends object>(dtoClass: new () => T, plain: objec
 export class UserController {
   async findAll(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
-      const page = req.query.page ? parseInt(req.query.page as string, 10) : undefined;
-      const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : undefined;
-      const username = req.query.username as string | undefined;
-      const name = req.query.name as string | undefined;
-      const email = req.query.email as string | undefined;
+      const page = req.query.page ? parseInt(req.query.page as string, 10) : 1;
+      const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 20;
       const role = req.query.role as UserRole | undefined;
       const isActiveParam = req.query.is_active as string | undefined;
       const is_active = isActiveParam !== undefined ? isActiveParam === "true" : undefined;
+      const search = req.query.search as string | undefined;
 
       if (role && !Object.values(UserRole).includes(role)) {
         res.status(400).json({ success: false, message: `Invalid role: ${role}` });
         return;
       }
 
-      const result = await userService.findAll({
-        page,
-        limit,
-        username,
-        name,
-        email,
-        role,
-        is_active,
-      });
-
+      const result = await userService.findAll(page, limit, role, is_active, search);
       res.status(200).json({ success: true, ...result });
     } catch (error) {
       next(error);
@@ -62,7 +51,6 @@ export class UserController {
     try {
       const id = req.params.id as string;
       const user = await userService.findById(id);
-
       res.status(200).json({ success: true, data: user });
     } catch (error) {
       next(error);
@@ -72,8 +60,7 @@ export class UserController {
   async create(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
       const dto = await validateDto(CreateUserDto, req.body);
-      const user = await userService.create(dto);
-
+      const user = await userService.create({ ...dto, createdBy: req.user?.id || "" });
       res.status(201).json({ success: true, data: user, message: "User created successfully" });
     } catch (error) {
       next(error);
@@ -91,7 +78,6 @@ export class UserController {
       }
 
       const user = await userService.update(id, dto, { id: req.user.id, role: req.user.role });
-
       res.status(200).json({ success: true, data: user, message: "User updated successfully" });
     } catch (error) {
       next(error);
@@ -108,7 +94,6 @@ export class UserController {
       }
 
       await userService.softDelete(id, { id: req.user.id, role: req.user.role });
-
       res.status(200).json({ success: true, message: "User deleted successfully" });
     } catch (error) {
       next(error);

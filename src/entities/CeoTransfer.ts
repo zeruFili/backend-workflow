@@ -1,28 +1,33 @@
 import {
   Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn,
-  ManyToOne, JoinColumn, Index,
+  ManyToOne, JoinColumn,
 } from "typeorm";
-import { Customer } from "./Customer";
-import { ReviewOutcome } from "../enums/review-outcome.enum";
+import { User } from "./User";
 
-@Entity("paid_customer")
-@Index("idx_paid_customer_customer_status", ["customer_id", "status"])
-export class PaidCustomer {
+@Entity("ceo_transfer")
+export class CeoTransfer {
   @PrimaryGeneratedColumn("uuid")
   id: string;
 
   @Column({ type: "uuid" })
-  customer_id: string;
+  finance_user_id: string;
 
-  @ManyToOne(() => Customer)
-  @JoinColumn({ name: "customer_id" })
-  customer: Customer;
+  @ManyToOne(() => User)
+  @JoinColumn({ name: "finance_user_id" })
+  finance_user: User;
+
+  @Column({ type: "uuid" })
+  ceo_user_id: string;
+
+  @ManyToOne(() => User)
+  @JoinColumn({ name: "ceo_user_id" })
+  ceo_user: User;
 
   @Column({ type: "text" })
   description: string;
 
-  @Column({ type: "enum", enum: ReviewOutcome, default: ReviewOutcome.PENDING })
-  status: ReviewOutcome;
+  @Column({ type: "numeric", precision: 15, scale: 2 })
+  amount: number;
 
   @Column({ type: "text", array: true, nullable: true })
   attachment_urls: string[];

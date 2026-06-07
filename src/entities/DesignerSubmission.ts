@@ -2,27 +2,27 @@ import {
   Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn,
   ManyToOne, JoinColumn, Index,
 } from "typeorm";
-import { Customer } from "./Customer";
-import { ReviewOutcome } from "../enums/review-outcome.enum";
+import { DesignerTask } from "./DesignerTask";
+import { DesignerStage } from "../enums/designer-stage.enum";
 
-@Entity("paid_customer")
-@Index("idx_paid_customer_customer_status", ["customer_id", "status"])
-export class PaidCustomer {
+@Entity("designer_submission")
+@Index("idx_designer_submission_task_id", ["designer_task_id"])
+export class DesignerSubmission {
   @PrimaryGeneratedColumn("uuid")
   id: string;
 
   @Column({ type: "uuid" })
-  customer_id: string;
+  designer_task_id: string;
 
-  @ManyToOne(() => Customer)
-  @JoinColumn({ name: "customer_id" })
-  customer: Customer;
+  @ManyToOne(() => DesignerTask)
+  @JoinColumn({ name: "designer_task_id" })
+  designer_task: DesignerTask;
+
+  @Column({ type: "enum", enum: DesignerStage, nullable: true })
+  stage: DesignerStage;
 
   @Column({ type: "text" })
   description: string;
-
-  @Column({ type: "enum", enum: ReviewOutcome, default: ReviewOutcome.PENDING })
-  status: ReviewOutcome;
 
   @Column({ type: "text", array: true, nullable: true })
   attachment_urls: string[];

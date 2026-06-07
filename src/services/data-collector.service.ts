@@ -1,11 +1,12 @@
 import { AppDataSource } from "../config/data-source";
-import { QuantitySurveyorTask } from "../entities/QuantitySurveyorTask";
-import { QuantitySurveyorSubmission } from "../entities/QuantitySurveyorSubmission";
-import { QuantitySurveyorReview } from "../entities/QuantitySurveyorReview";
+import { DataCollectorTask } from "../entities/DataCollectorTask";
+import { DataCollectorSubmission } from "../entities/DataCollectorSubmission";
+import { DataCollectorReview } from "../entities/DataCollectorReview";
 import { User } from "../entities/User";
 import { Notification } from "../entities/Notification";
-import { ReviewOutcome } from "../enums/review-outcome.enum";
+import { DataCollectorTaskStatus } from "../enums/data-collector-task-status.enum";
 import { TaskState } from "../enums/task-state.enum";
+import { ReviewOutcome } from "../enums/review-outcome.enum";
 import { UserRole } from "../enums/user-role.enum";
 import { AppError } from "../middlewares/error.middleware";
 
@@ -21,25 +22,27 @@ interface PaginatedParams {
 interface CreateTaskParams {
   title: string;
   description: string;
-  assigned_to_user_id: string;
-  due_date: string;
+  assigned_to_user_id?: string;
+  due_date?: string;
 }
 
 interface UpdateTaskParams {
   title?: string;
   description?: string;
-  status?: ReviewOutcome;
+  status?: DataCollectorTaskStatus;
+  task_state?: TaskState;
   due_date?: string;
+  assigned_to_user_id?: string;
 }
 
-export class QuantitySurveyorService {
-  private taskRepo = AppDataSource.getRepository(QuantitySurveyorTask);
-  private submissionRepo = AppDataSource.getRepository(QuantitySurveyorSubmission);
-  private reviewRepo = AppDataSource.getRepository(QuantitySurveyorReview);
+export class DataCollectorService {
+  private taskRepo = AppDataSource.getRepository(DataCollectorTask);
+  private submissionRepo = AppDataSource.getRepository(DataCollectorSubmission);
+  private reviewRepo = AppDataSource.getRepository(DataCollectorReview);
   private userRepo = AppDataSource.getRepository(User);
   private notificationRepo = AppDataSource.getRepository(Notification);
 
-  private async createNotification(params: {
+  private async createNotification(data: {
     user_id: string;
     from_user_id: string;
     resource_id: string;
@@ -49,13 +52,13 @@ export class QuantitySurveyorService {
     type: string;
   }) {
     const n = new Notification();
-    n.user_id = params.user_id;
-    n.from_user_id = params.from_user_id;
-    n.resource_id = params.resource_id;
-    n.resource_type = params.resource_type;
-    n.parent_id = params.parent_id;
-    n.parent_type = params.parent_type;
-    n.type = params.type;
+    n.user_id = data.user_id;
+    n.from_user_id = data.from_user_id;
+    n.resource_id = data.resource_id;
+    n.resource_type = data.resource_type;
+    n.parent_id = data.parent_id;
+    n.parent_type = data.parent_type;
+    n.type = data.type;
     n.viewed = false;
     return this.notificationRepo.save(n);
   }
@@ -65,10 +68,11 @@ export class QuantitySurveyorService {
 
     const qb = this.taskRepo.createQueryBuilder("t")
       .leftJoinAndSelect("t.assigned_to_user", "assigned_to_user")
-      .leftJoinAndSelect("t.assigned_by_user", "assigned_by_user");
+      .leftJoinAndSelect("t.assigned_by_user", "assigned_by_user")
+      .leftJoinAndSelect("t.updated_by_user", "updated_by_user");
 
-    const isQS = currentUser.role === UserRole.QUANTITY_SURVEYOR;
-    if (isQS) {
+    const isDataCollector = currentUser.role === UserRole.DATA_COLLECTOR;
+    if (isDataCollector) {
       qb.andWhere("t.assigned_to_user_id = :userId", { userId: currentUser.id });
     }
 
@@ -96,12 +100,12 @@ export class QuantitySurveyorService {
   async findTaskById(id: string) {
     const task = await this.taskRepo.findOne({
       where: { id },
-      relations: ["assigned_to_user", "assigned_by_user"],
+      relations: ["assigned_to_user", "assigned_by_user", "updated_by_user"],
     });
-    if (!task) throw new AppError(404, "Quantity surveyor task not found");
+    if (!task) throw new AppError(404, "Data collector task not found");
 
     const submissions = await this.submissionRepo.find({
-      where: { quantity_surveyor_task_id: id },
+      where: { data_collector_task_id: id },
       order: { created_at: "DESC" },
     });
 
@@ -109,52 +113,57 @@ export class QuantitySurveyorService {
   }
 
   async createTask(params: CreateTaskParams, assignedByUserId: string) {
-    const task = new QuantitySurveyorTask();
+    const task = new DataCollectorTask();
     task.title = params.title;
     task.description = params.description;
     task.assigned_by_user_id = assignedByUserId;
-    task.assigned_to_user_id = params.assigned_to_user_id;
-    task.due_date = params.due_date;
-    task.status = ReviewOutcome.PENDING;
+    task.assigned_to_user_id = params.assigned_to_user_id ?? null as any;
+    task.due_date = params.due_date ?? null as any;
+    task.status = DataCollectorTaskStatus.PENDING;
     task.task_state = TaskState.ACTIVE;
 
     const saved = await this.taskRepo.save(task);
 
-    await this.createNotification({
-      user_id: saved.assigned_to_user_id,
-      from_user_id: assignedByUserId,
-      resource_id: saved.id,
-      resource_type: "task_assigned",
-      parent_id: saved.id,
-      parent_type: "quantity_surveyor_task",
-      type: "New quantity surveyor task assigned",
-    });
+    if (saved.assigned_to_user_id) {
+      await this.createNotification({
+        user_id: saved.assigned_to_user_id,
+        from_user_id: assignedByUserId,
+        resource_id: saved.id,
+        resource_type: "task_assigned",
+        parent_id: saved.id,
+        parent_type: "data_collector_task",
+        type: "New data collector task assigned",
+      });
+    }
 
     return saved;
   }
 
-  async updateTask(id: string, params: UpdateTaskParams) {
+  async updateTask(id: string, params: UpdateTaskParams, userId: string) {
     const task = await this.taskRepo.findOneBy({ id });
-    if (!task) throw new AppError(404, "Quantity surveyor task not found");
+    if (!task) throw new AppError(404, "Data collector task not found");
 
     if (params.title !== undefined) task.title = params.title;
     if (params.description !== undefined) task.description = params.description;
     if (params.status !== undefined) task.status = params.status;
-    if (params.due_date !== undefined) task.due_date = params.due_date;
+    if (params.task_state !== undefined) task.task_state = params.task_state;
+    if (params.due_date !== undefined) task.due_date = params.due_date as any;
+    if (params.assigned_to_user_id !== undefined) task.assigned_to_user_id = params.assigned_to_user_id as any;
+    task.updated_by = userId as any;
 
     return this.taskRepo.save(task);
   }
 
   async createSubmission(taskId: string, description: string, userId: string, attachmentUrls?: string[]) {
     const task = await this.taskRepo.findOneBy({ id: taskId });
-    if (!task) throw new AppError(404, "Quantity surveyor task not found");
+    if (!task) throw new AppError(404, "Data collector task not found");
 
     if (task.task_state !== TaskState.ACTIVE) {
       throw new AppError(400, "Cannot submit to a deactive task");
     }
 
-    const submission = new QuantitySurveyorSubmission();
-    submission.quantity_surveyor_task_id = taskId;
+    const submission = new DataCollectorSubmission();
+    submission.data_collector_task_id = taskId;
     submission.description = description;
     submission.attachment_urls = attachmentUrls ?? null as any;
 
@@ -174,8 +183,8 @@ export class QuantitySurveyorService {
         resource_id: saved.id,
         resource_type: "submission",
         parent_id: taskId,
-        parent_type: "quantity_surveyor_task",
-        type: "New quantity surveyor submission",
+        parent_type: "data_collector_task",
+        type: "New data collector submission",
       });
     }
 
@@ -184,10 +193,10 @@ export class QuantitySurveyorService {
 
   async getSubmissions(taskId: string) {
     const task = await this.taskRepo.findOneBy({ id: taskId });
-    if (!task) throw new AppError(404, "Quantity surveyor task not found");
+    if (!task) throw new AppError(404, "Data collector task not found");
 
     return this.submissionRepo.find({
-      where: { quantity_surveyor_task_id: taskId },
+      where: { data_collector_task_id: taskId },
       order: { created_at: "DESC" },
     });
   }
@@ -200,21 +209,25 @@ export class QuantitySurveyorService {
   ) {
     const submission = await this.submissionRepo.findOne({
       where: { id: submissionId },
-      relations: ["quantity_surveyor_task"],
+      relations: ["data_collector_task"],
     });
-    if (!submission) throw new AppError(404, "Quantity surveyor submission not found");
+    if (!submission) throw new AppError(404, "Data collector submission not found");
 
-    const review = new QuantitySurveyorReview();
-    review.quantity_surveyor_submission_id = submissionId;
+    const review = new DataCollectorReview();
+    review.data_collector_submission_id = submissionId;
     review.reviewer_user_id = reviewerUserId;
     review.review_outcome = reviewOutcome;
     review.description = description;
 
     const saved = await this.reviewRepo.save(review);
 
-    const task = submission.quantity_surveyor_task;
+    const task = submission.data_collector_task;
     if (task) {
-      task.status = reviewOutcome;
+      const mappedStatus = reviewOutcome === ReviewOutcome.APPROVED
+        ? DataCollectorTaskStatus.APPROVE
+        : reviewOutcome as unknown as DataCollectorTaskStatus;
+      task.status = mappedStatus;
+      task.updated_by = reviewerUserId as any;
       await this.taskRepo.save(task);
     }
 
@@ -225,8 +238,8 @@ export class QuantitySurveyorService {
         resource_id: saved.id,
         resource_type: "review",
         parent_id: task.id,
-        parent_type: "quantity_surveyor_task",
-        type: `Your submission was ${reviewOutcome}`,
+        parent_type: "data_collector_task",
+        type: `Submission ${reviewOutcome}`,
       });
     }
 
@@ -235,14 +248,14 @@ export class QuantitySurveyorService {
 
   async getReviews(submissionId: string) {
     const submission = await this.submissionRepo.findOneBy({ id: submissionId });
-    if (!submission) throw new AppError(404, "Quantity surveyor submission not found");
+    if (!submission) throw new AppError(404, "Data collector submission not found");
 
     return this.reviewRepo.find({
-      where: { quantity_surveyor_submission_id: submissionId },
+      where: { data_collector_submission_id: submissionId },
       relations: ["reviewer_user"],
       order: { created_at: "DESC" },
     });
   }
 }
 
-export const quantitySurveyorService = new QuantitySurveyorService();
+export const dataCollectorService = new DataCollectorService();

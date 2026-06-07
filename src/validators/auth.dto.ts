@@ -2,17 +2,12 @@ import { IsString, Length } from "class-validator";
 
 export class LoginDto {
   @IsString()
-  @Length(3, 100)
-  username: string;
+  @Length(1, 255)
+  email: string;
 
   @IsString()
   @Length(6, 128)
   password: string;
-}
-
-export class RefreshTokenDto {
-  @IsString()
-  refreshToken: string;
 }
 
 export class ForgotPasswordDto {

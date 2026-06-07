@@ -3,44 +3,48 @@ import {
   ManyToOne, JoinColumn, Index,
 } from "typeorm";
 import { User } from "./User";
-import { NotificationType } from "../enums/notification-type.enum";
 
-@Entity("notifications")
+@Entity("notification")
+@Index("idx_notif_user_parent", ["user_id", "parent_id", "viewed"])
+@Index("idx_notif_user_resource", ["user_id", "resource_id", "viewed"])
+@Index("idx_notif_user_resource_type", ["user_id", "resource_type", "viewed"])
+@Index("idx_notif_user_parent_type", ["user_id", "parent_type", "viewed"])
 export class Notification {
   @PrimaryGeneratedColumn("uuid")
   id: string;
 
-  @Index()
   @Column({ type: "uuid" })
   user_id: string;
 
-  @ManyToOne(() => User, (user) => user.notifications, { onDelete: "CASCADE" })
+  @ManyToOne(() => User)
   @JoinColumn({ name: "user_id" })
   user: User;
 
-  @Index()
-  @Column({ type: "enum", enum: NotificationType })
-  type: NotificationType;
+  @Column({ type: "uuid" })
+  from_user_id: string;
 
-  @Column({ type: "varchar", length: 500 })
-  title: string;
+  @ManyToOne(() => User)
+  @JoinColumn({ name: "from_user_id" })
+  from_user: User;
 
-  @Column({ type: "text", nullable: true })
-  body: string | null;
+  @Column({ type: "uuid" })
+  resource_id: string;
+
+  @Column({ type: "varchar", length: 50 })
+  resource_type: string;
+
+  @Column({ type: "uuid" })
+  parent_id: string;
 
   @Column({ type: "varchar", length: 50, nullable: true })
-  entity_type: string | null;
+  parent_type: string;
 
-  @Column({ type: "uuid", nullable: true })
-  entity_id: string | null;
+  @Column({ type: "varchar", length: 255 })
+  type: string;
 
-  @Index()
   @Column({ type: "boolean", default: false })
-  is_read: boolean;
+  viewed: boolean;
 
-  @Column({ type: "timestamptz", nullable: true })
-  read_at: Date | null;
-
-  @CreateDateColumn({ type: "timestamptz", default: () => "now()" })
+  @CreateDateColumn({ type: "timestamptz", default: () => "NOW()" })
   created_at: Date;
 }

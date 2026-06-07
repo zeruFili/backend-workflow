@@ -3,13 +3,13 @@ import { validate } from "class-validator";
 import { plainToInstance } from "class-transformer";
 import { AuthRequest } from "../middlewares/auth.middleware";
 import { AppError } from "../middlewares/error.middleware";
-import { quantitySurveyorService } from "../services/qs.service";
+import { dataCollectorService } from "../services/data-collector.service";
 import {
-  CreateQSTaskDto,
-  UpdateQSTaskDto,
-  CreateQSSubmissionDto,
-  CreateQSReviewDto,
-} from "../validators/qs.dto";
+  CreateDCTaskDto,
+  UpdateDCTaskDto,
+  CreateDCSubmissionDto,
+  CreateDCReviewDto,
+} from "../validators/data-collector.dto";
 
 async function validateDto<T extends object>(dtoClass: new () => T, plain: object): Promise<T> {
   const instance = plainToInstance(dtoClass, plain);
@@ -29,7 +29,7 @@ async function validateDto<T extends object>(dtoClass: new () => T, plain: objec
   return instance;
 }
 
-export class QuantitySurveyorController {
+export class DataCollectorController {
   async findAllTasks(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
       if (!req.user) {
@@ -43,7 +43,7 @@ export class QuantitySurveyorController {
       const assignedTo = req.query.assignedTo as string | undefined;
       const search = req.query.search as string | undefined;
 
-      const result = await quantitySurveyorService.findAllTasks({
+      const result = await dataCollectorService.findAllTasks({
         page,
         limit,
         status,
@@ -61,7 +61,7 @@ export class QuantitySurveyorController {
   async findTaskById(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
       const id = req.params.id as string;
-      const task = await quantitySurveyorService.findTaskById(id);
+      const task = await dataCollectorService.findTaskById(id);
       res.status(200).json({ success: true, data: task });
     } catch (error) {
       next(error);
@@ -75,9 +75,9 @@ export class QuantitySurveyorController {
         return;
       }
 
-      const dto = await validateDto(CreateQSTaskDto, req.body);
-      const task = await quantitySurveyorService.createTask(dto, req.user.id);
-      res.status(201).json({ success: true, data: task, message: "QS task created successfully" });
+      const dto = await validateDto(CreateDCTaskDto, req.body);
+      const task = await dataCollectorService.createTask(dto, req.user.id);
+      res.status(201).json({ success: true, data: task, message: "Data collector task created successfully" });
     } catch (error) {
       next(error);
     }
@@ -85,10 +85,15 @@ export class QuantitySurveyorController {
 
   async updateTask(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
+      if (!req.user) {
+        res.status(401).json({ success: false, message: "Unauthorized" });
+        return;
+      }
+
       const id = req.params.id as string;
-      const dto = await validateDto(UpdateQSTaskDto, req.body);
-      const task = await quantitySurveyorService.updateTask(id, dto);
-      res.status(200).json({ success: true, data: task, message: "QS task updated successfully" });
+      const dto = await validateDto(UpdateDCTaskDto, req.body);
+      const task = await dataCollectorService.updateTask(id, dto, req.user.id);
+      res.status(200).json({ success: true, data: task, message: "Data collector task updated successfully" });
     } catch (error) {
       next(error);
     }
@@ -102,9 +107,9 @@ export class QuantitySurveyorController {
       }
 
       const taskId = req.params.id as string;
-      const dto = await validateDto(CreateQSSubmissionDto, req.body);
+      const dto = await validateDto(CreateDCSubmissionDto, req.body);
       const attachmentUrls = req.body.attachment_urls as string[] | undefined;
-      const submission = await quantitySurveyorService.createSubmission(taskId, dto.description, req.user.id, attachmentUrls);
+      const submission = await dataCollectorService.createSubmission(taskId, dto.description, req.user.id, attachmentUrls);
       res.status(201).json({ success: true, data: submission, message: "Submission created successfully" });
     } catch (error) {
       next(error);
@@ -114,7 +119,7 @@ export class QuantitySurveyorController {
   async getSubmissions(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
       const taskId = req.params.id as string;
-      const submissions = await quantitySurveyorService.getSubmissions(taskId);
+      const submissions = await dataCollectorService.getSubmissions(taskId);
       res.status(200).json({ success: true, data: submissions });
     } catch (error) {
       next(error);
@@ -129,8 +134,8 @@ export class QuantitySurveyorController {
       }
 
       const submissionId = req.params.id as string;
-      const dto = await validateDto(CreateQSReviewDto, req.body);
-      const review = await quantitySurveyorService.createReview(
+      const dto = await validateDto(CreateDCReviewDto, req.body);
+      const review = await dataCollectorService.createReview(
         submissionId,
         req.user.id,
         dto.review_outcome,
@@ -145,7 +150,7 @@ export class QuantitySurveyorController {
   async getReviews(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
       const submissionId = req.params.id as string;
-      const reviews = await quantitySurveyorService.getReviews(submissionId);
+      const reviews = await dataCollectorService.getReviews(submissionId);
       res.status(200).json({ success: true, data: reviews });
     } catch (error) {
       next(error);
@@ -153,4 +158,4 @@ export class QuantitySurveyorController {
   }
 }
 
-export const quantitySurveyorController = new QuantitySurveyorController();
+export const dataCollectorController = new DataCollectorController();

@@ -3,12 +3,8 @@ import { UserRole } from "../enums/user-role.enum";
 
 export class CreateUserDto {
   @IsString()
-  @Length(3, 100)
-  username: string;
-
-  @IsString()
   @Length(1, 255)
-  name: string;
+  full_name: string;
 
   @IsEmail()
   @Length(1, 255)
@@ -16,6 +12,7 @@ export class CreateUserDto {
 
   @IsString()
   @MinLength(8)
+  @Length(8, 128)
   @Matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^\da-zA-Z]).{8,128}$/, {
     message: "Password must include uppercase, lowercase, digit, and special character",
   })
@@ -34,7 +31,7 @@ export class UpdateUserDto {
   @IsOptional()
   @IsString()
   @Length(1, 255)
-  name?: string;
+  full_name?: string;
 
   @IsOptional()
   @IsEmail()
@@ -53,6 +50,7 @@ export class UpdateUserDto {
   @IsOptional()
   @IsString()
   @MinLength(8)
+  @Length(8, 128)
   @Matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^\da-zA-Z]).{8,128}$/, {
     message: "Password must include uppercase, lowercase, digit, and special character",
   })

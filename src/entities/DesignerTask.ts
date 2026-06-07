@@ -1,0 +1,65 @@
+import {
+  Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn,
+  ManyToOne, JoinColumn, Index,
+} from "typeorm";
+import { User } from "./User";
+import { ReviewOutcome } from "../enums/review-outcome.enum";
+import { DesignerStage } from "../enums/designer-stage.enum";
+import { TaskState } from "../enums/task-state.enum";
+
+@Entity("designer_task")
+@Index("idx_designer_task_assigned_to_user_id", ["assigned_to_user_id"])
+export class DesignerTask {
+  @PrimaryGeneratedColumn("uuid")
+  id: string;
+
+  @Column({ type: "uuid", nullable: true })
+  assigned_to_user_id: string;
+
+  @ManyToOne(() => User)
+  @JoinColumn({ name: "assigned_to_user_id" })
+  assigned_to_user: User;
+
+  @Column({ type: "uuid" })
+  assigned_by_user_id: string;
+
+  @ManyToOne(() => User)
+  @JoinColumn({ name: "assigned_by_user_id" })
+  assigned_by_user: User;
+
+  @Column({ type: "varchar", length: 500 })
+  title: string;
+
+  @Column({ type: "text" })
+  description: string;
+
+  @Column({ type: "enum", enum: ReviewOutcome, nullable: true, default: ReviewOutcome.PENDING })
+  status: ReviewOutcome;
+
+  @Column({ type: "enum", enum: DesignerStage, nullable: true })
+  stage: DesignerStage;
+
+  @Column({ type: "boolean", nullable: true })
+  is_paused: boolean;
+
+  @Column({ type: "boolean", nullable: true })
+  is_public: boolean;
+
+  @Column({ type: "enum", enum: TaskState })
+  task_state: TaskState;
+
+  @Column({ type: "int" })
+  story_point: number;
+
+  @Column({ type: "date", nullable: true })
+  due_date: string;
+
+  @Column({ type: "text", array: true, nullable: true })
+  attachment_urls: string[];
+
+  @CreateDateColumn({ type: "timestamptz", default: () => "NOW()" })
+  created_at: Date;
+
+  @UpdateDateColumn({ type: "timestamptz", default: () => "NOW()" })
+  updated_at: Date;
+}
