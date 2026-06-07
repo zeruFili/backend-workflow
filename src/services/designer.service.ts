@@ -506,10 +506,6 @@ export class DesignerService {
     const task = await this.taskRepo.findOneBy({ id: taskId });
     if (!task) throw new AppError(404, "Designer task not found");
 
-    const avg = Math.round(
-      (creativity + timeliness + renderingQuality + clientUnderstanding) / 4
-    );
-
     const review = new DesignerTaskReview();
     review.designer_task_id = taskId;
     review.reviewer_user_id = reviewerUserId;
@@ -517,7 +513,6 @@ export class DesignerService {
     review.timeliness = timeliness;
     review.rendering_quality = renderingQuality;
     review.client_understanding = clientUnderstanding;
-    review.review_outcome = avg;
     review.description = (description ?? null) as any;
 
     const saved = await this.taskReviewRepo.save(review);

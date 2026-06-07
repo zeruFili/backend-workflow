@@ -44,8 +44,6 @@ export class DesignerTaskReview {
   @Column({ type: "smallint" })
   client_understanding: number;
 
-  @Column({ type: "smallint" })
-  review_outcome: number;
 
   @CreateDateColumn({ type: "timestamptz", default: () => "NOW()" })
   created_at: Date;
