@@ -5,6 +5,7 @@ import { QuantitySurveyorReview } from "../entities/QuantitySurveyorReview";
 import { User } from "../entities/User";
 import { Notification } from "../entities/Notification";
 import { ReviewOutcome } from "../enums/review-outcome.enum";
+import { SubmissionReviewStatus } from "../enums/submission-review-status.enum";
 import { TaskState } from "../enums/task-state.enum";
 import { UserRole } from "../enums/user-role.enum";
 import { ResourceType } from "../enums/resource-type.enum";
@@ -159,6 +160,7 @@ export class QuantitySurveyorService {
     submission.quantity_surveyor_task_id = taskId;
     submission.description = description;
     submission.attachment_urls = attachmentUrls ?? null as any;
+    submission.review_status = SubmissionReviewStatus.PENDING_REVIEW;
 
     const saved = await this.submissionRepo.save(submission);
 
@@ -219,6 +221,11 @@ export class QuantitySurveyorService {
       task.status = reviewOutcome;
       await this.taskRepo.save(task);
     }
+
+    submission.review_status = reviewOutcome === ReviewOutcome.APPROVED
+      ? SubmissionReviewStatus.APPROVED
+      : SubmissionReviewStatus.REVISION_REQUIRED;
+    await this.submissionRepo.save(submission);
 
     if (task?.assigned_to_user_id) {
       await this.createNotification({
