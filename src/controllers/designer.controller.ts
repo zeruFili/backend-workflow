@@ -93,7 +93,14 @@ export class DesignerController {
       }
 
       const dto = await validateDto(CreateDesignerTaskDto, req.body);
-      const task = await designerService.createTask(dto, req.user.id);
+      const attachmentUrls = req.body.attachment_urls as string[] | undefined;
+      const task = await designerService.createTask(
+        {
+          ...dto,
+          attachment_urls: attachmentUrls,
+        },
+        req.user.id
+      );
       res.status(201).json({ success: true, data: task, message: "Designer task created successfully" });
     } catch (error) {
       next(error);

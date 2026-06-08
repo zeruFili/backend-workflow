@@ -34,6 +34,7 @@ interface CreateTaskParams {
   is_public?: boolean;
   due_date?: string;
   assigned_to_user_id?: string;
+  attachment_urls?: string[];
 }
 
 interface UpdateTaskParams {
@@ -162,6 +163,7 @@ export class DesignerService {
     task.story_point = params.story_point;
     task.is_public = params.is_public ?? false;
     task.due_date = (params.due_date ?? null) as any;
+    task.attachment_urls = (params.attachment_urls ?? null) as any;
     task.status = ReviewOutcome.PENDING;
     task.task_state = TaskState.ACTIVE;
     task.is_paused = false;

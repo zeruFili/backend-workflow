@@ -44,7 +44,8 @@ interface CurrentUser {
 }
 
 const userRepo = () => AppDataSource.getRepository(User);
-const BCRYPT_COST = 12;
+const parsedBcryptCost = Number(process.env.BCRYPT_COST);
+const BCRYPT_COST = Number.isFinite(parsedBcryptCost) && parsedBcryptCost > 0 ? parsedBcryptCost : 12;
 
 function sanitizeUser(user: User): Partial<User> {
   const { password_hash, ...rest } = user;

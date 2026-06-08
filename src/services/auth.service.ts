@@ -7,9 +7,10 @@ import { AppError } from "../middlewares/error.middleware";
 const userRepo = () => AppDataSource.getRepository(User);
 
 const JWT_SECRET = process.env.JWT_SECRET || "default_secret";
-const ACCESS_TOKEN_TTL = "15m";
-const RESET_TOKEN_TTL = "1h";
-const BCRYPT_COST = 12;
+const ACCESS_TOKEN_TTL = (process.env.ACCESS_TOKEN_TTL || "15m") as jwt.SignOptions["expiresIn"];
+const RESET_TOKEN_TTL = (process.env.RESET_TOKEN_TTL || "1h") as jwt.SignOptions["expiresIn"];
+const parsedBcryptCost = Number(process.env.BCRYPT_COST);
+const BCRYPT_COST = Number.isFinite(parsedBcryptCost) && parsedBcryptCost > 0 ? parsedBcryptCost : 12;
 
 function generateAccessToken(user: {
   id: string;

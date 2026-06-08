@@ -1,4 +1,4 @@
-import { IsString, IsEnum, IsOptional, Length, IsUUID, IsInt, Min, Max, IsBoolean } from "class-validator";
+import { IsString, IsEnum, IsOptional, Length, IsUUID, IsInt, Min, Max, IsBoolean, IsArray } from "class-validator";
 import { DesignerStage } from "../enums/designer-stage.enum";
 import { ReviewOutcome } from "../enums/review-outcome.enum";
 
@@ -27,6 +27,11 @@ export class CreateDesignerTaskDto {
   @IsOptional()
   @IsUUID()
   assigned_to_user_id?: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  attachment_urls?: string[];
 }
 
 export class UpdateDesignerTaskDto {
