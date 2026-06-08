@@ -61,6 +61,12 @@ interface ApplicationListParams {
   currentUser: { id: string; role: UserRole };
 }
 
+interface AssignedByUserSummary {
+  id: string;
+  full_name: string;
+  role: UserRole;
+}
+
 const DESIGNER_TASK_LIST_FORBIDDEN_MESSAGE = "You are not authorized to view designer tasks.";
 
 const STAGE_ORDER: DesignerStage[] = [
@@ -100,6 +106,25 @@ export class DesignerService {
     n.type = params.type;
     n.viewed = false;
     return this.notificationRepo.save(n);
+  }
+
+  private summarizeAssignedByUser(user?: User | null): AssignedByUserSummary | null {
+    if (!user) {
+      return null;
+    }
+
+    return {
+      id: user.id,
+      full_name: user.full_name,
+      role: user.role,
+    };
+  }
+
+  private sanitizeDesignerTask<T extends { assigned_by_user?: User | null }>(task: T) {
+    return {
+      ...task,
+      assigned_by_user: this.summarizeAssignedByUser(task.assigned_by_user),
+    };
   }
 
   private applyTaskListVisibilityScope(
@@ -145,7 +170,7 @@ export class DesignerService {
 
     return {
       success: true,
-      data,
+      data: data.map((task) => this.sanitizeDesignerTask(task)),
       meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
     };
   }
@@ -168,7 +193,11 @@ export class DesignerService {
       order: { created_at: "DESC" },
     });
 
-    return { ...task, submissions, applications };
+    return {
+      ...this.sanitizeDesignerTask(task),
+      submissions,
+      applications,
+    };
   }
 
   async createTask(params: CreateTaskParams, assignedByUserId: string) {
