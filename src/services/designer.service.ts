@@ -407,63 +407,6 @@ export class DesignerService {
     };
   }
 
-  async reviewApplication(
-    applicationId: string,
-    reviewOutcome: ReviewOutcome,
-    reviewerUserId: string
-  ) {
-    const application = await this.applicationRepo.findOne({
-      where: { id: applicationId },
-      relations: ["designer_task"],
-    });
-    if (!application) throw new AppError(404, "Designer application not found");
-
-    if (reviewOutcome === ReviewOutcome.APPROVED) {
-      const task = application.designer_task;
-      if (task && !task.assigned_to_user_id) {
-        task.assigned_to_user_id = application.applicant_user_id as any;
-        await this.taskRepo.save(task);
-
-        const otherPending = await this.applicationRepo.find({
-          where: { designer_task_id: task.id },
-        });
-
-        for (const other of otherPending) {
-          if (other.id !== applicationId) {
-            await this.applicationRepo.delete({ id: other.id });
-          }
-        }
-
-        await this.createNotification({
-          user_id: application.applicant_user_id,
-          from_user_id: reviewerUserId,
-          resource_id: task.id,
-          resource_type: ResourceType.TASK_ASSIGNED,
-          parent_id: task.id,
-          parent_type: ParentType.DESIGNER_TASK,
-          type: "Your application has been accepted",
-        });
-      }
-    }
-
-    if (reviewOutcome === ReviewOutcome.REJECTED) {
-      const task = application.designer_task;
-      await this.createNotification({
-        user_id: application.applicant_user_id,
-        from_user_id: reviewerUserId,
-        resource_id: application.designer_task_id,
-        resource_type: ResourceType.APPLY,
-        parent_id: application.designer_task_id,
-        parent_type: ParentType.DESIGNER_TASK,
-        type: "Your application was not accepted",
-      });
-    }
-
-    await this.applicationRepo.delete({ id: applicationId });
-
-    return { id: applicationId, review_outcome: reviewOutcome };
-  }
-
   async createSubmission(
     taskId: string,
     userId: string,

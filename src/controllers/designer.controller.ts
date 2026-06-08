@@ -182,24 +182,6 @@ export class DesignerController {
     }
   }
 
-  async reviewApplication(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
-    try {
-      if (!req.user) {
-        res.status(401).json({ success: false, message: "Unauthorized" });
-        return;
-      }
-
-      const applicationId = req.params.id as string;
-      const { review_outcome } = req.body as { review_outcome: string };
-      const outcome = parseReviewOutcome(review_outcome);
-
-      const result = await designerService.reviewApplication(applicationId, outcome, req.user.id);
-      res.status(200).json({ success: true, data: result, message: "Application reviewed successfully" });
-    } catch (error) {
-      next(error);
-    }
-  }
-
   async createSubmission(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
       if (!req.user) {
