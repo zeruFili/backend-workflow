@@ -56,6 +56,8 @@ interface ApplicationListParams {
   currentUser: { id: string; role: UserRole };
 }
 
+const DESIGNER_TASK_LIST_FORBIDDEN_MESSAGE = "You are not authorized to view designer tasks.";
+
 const STAGE_ORDER: DesignerStage[] = [
   DesignerStage.CASE_STUDY,
   DesignerStage.DESIGNING,
@@ -95,6 +97,22 @@ export class DesignerService {
     return this.notificationRepo.save(n);
   }
 
+  private applyTaskListVisibilityScope(
+    qb: ReturnType<typeof this.taskRepo.createQueryBuilder>,
+    currentUser: { id: string; role: UserRole }
+  ) {
+    if (currentUser.role === UserRole.CEO || currentUser.role === UserRole.GENERAL_MANAGER) {
+      return;
+    }
+
+    if (currentUser.role === UserRole.DESIGNER) {
+      qb.andWhere("t.is_public = TRUE");
+      return;
+    }
+
+    throw new AppError(403, DESIGNER_TASK_LIST_FORBIDDEN_MESSAGE);
+  }
+
   async findAllTasks(params: PaginatedParams) {
     const { page, limit, status, assignedTo, isPublic, isPaused, search, currentUser } = params;
 
@@ -102,13 +120,7 @@ export class DesignerService {
       .leftJoinAndSelect("t.assigned_to_user", "assigned_to_user")
       .leftJoinAndSelect("t.assigned_by_user", "assigned_by_user");
 
-    const isDesigner = currentUser.role === UserRole.DESIGNER;
-    if (isDesigner) {
-      qb.andWhere(
-        "(t.assigned_to_user_id = :userId OR (t.is_public = TRUE AND t.assigned_to_user_id IS NULL))",
-        { userId: currentUser.id }
-      );
-    }
+    this.applyTaskListVisibilityScope(qb, currentUser);
 
     if (status) qb.andWhere("t.status = :status", { status });
     if (assignedTo) qb.andWhere("t.assigned_to_user_id = :assignedTo", { assignedTo });
