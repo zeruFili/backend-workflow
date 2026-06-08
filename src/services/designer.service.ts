@@ -120,6 +120,10 @@ export class DesignerService {
     };
   }
 
+  private summarizeApplicantUser(user?: User | null): AssignedByUserSummary | null {
+    return this.summarizeAssignedByUser(user);
+  }
+
   private sanitizeDesignerTask<T extends { assigned_by_user?: User | null }>(task: T) {
     return {
       ...task,
@@ -193,10 +197,15 @@ export class DesignerService {
       order: { created_at: "DESC" },
     });
 
+    const sanitizedApplications = applications.map((a) => ({
+      ...a,
+      applicant_user: this.summarizeApplicantUser(a.applicant_user as any),
+    }));
+
     return {
       ...this.sanitizeDesignerTask(task),
       submissions,
-      applications,
+      applications: sanitizedApplications,
     };
   }
 
@@ -386,9 +395,14 @@ export class DesignerService {
     const skip = (page - 1) * limit;
     const [data, total] = await qb.skip(skip).take(limit).getManyAndCount();
 
+    const sanitized = data.map((a) => ({
+      ...a,
+      applicant_user: this.summarizeApplicantUser((a as any).applicant_user),
+    }));
+
     return {
       success: true,
-      data,
+      data: sanitized,
       meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
     };
   }
