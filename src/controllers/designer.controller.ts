@@ -109,9 +109,14 @@ export class DesignerController {
 
   async updateTask(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
+      if (!req.user) {
+        res.status(401).json({ success: false, message: "Unauthorized" });
+        return;
+      }
+
       const id = req.params.id as string;
       const dto = await validateDto(UpdateDesignerTaskDto, req.body);
-      const task = await designerService.updateTask(id, dto);
+      const task = await designerService.updateTask(id, dto, req.user);
       res.status(200).json({ success: true, data: task, message: "Designer task updated successfully" });
     } catch (error) {
       next(error);

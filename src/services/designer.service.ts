@@ -48,6 +48,11 @@ interface UpdateTaskParams {
   assigned_to_user_id?: string;
 }
 
+interface UpdateTaskActor {
+  id: string;
+  role: UserRole;
+}
+
 interface ApplicationListParams {
   page: number;
   limit: number;
@@ -215,9 +220,19 @@ export class DesignerService {
     return saved;
   }
 
-  async updateTask(id: string, params: UpdateTaskParams) {
+  async updateTask(id: string, params: UpdateTaskParams, currentUser: UpdateTaskActor) {
     const task = await this.taskRepo.findOneBy({ id });
     if (!task) throw new AppError(404, "Designer task not found");
+
+    if (currentUser.role === UserRole.GENERAL_MANAGER) {
+      if (task.assigned_by_user_id !== currentUser.id) {
+        throw new AppError(403, "Only the General Manager who created this task can update it");
+      }
+    } else if (currentUser.role === UserRole.CEO) {
+      task.updated_by = currentUser.id as any;
+    } else {
+      throw new AppError(403, DESIGNER_TASK_LIST_FORBIDDEN_MESSAGE);
+    }
 
     if (params.title !== undefined) task.title = params.title;
     if (params.description !== undefined) task.description = params.description;
@@ -227,6 +242,10 @@ export class DesignerService {
     if (params.story_point !== undefined) task.story_point = params.story_point;
     if (params.due_date !== undefined) task.due_date = params.due_date as any;
     if (params.assigned_to_user_id !== undefined) task.assigned_to_user_id = params.assigned_to_user_id as any;
+
+    if (currentUser.role === UserRole.CEO) {
+      task.updated_by = currentUser.id as any;
+    }
 
     return this.taskRepo.save(task);
   }
