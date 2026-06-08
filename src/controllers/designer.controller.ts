@@ -5,6 +5,7 @@ import { AuthRequest } from "../middlewares/auth.middleware";
 import { AppError } from "../middlewares/error.middleware";
 import { designerService } from "../services/designer.service";
 import { ReviewOutcome } from "../enums/review-outcome.enum";
+import { getFilePathsFromRequest } from "../utils/upload.utils";
 import {
   CreateDesignerTaskDto,
   UpdateDesignerTaskDto,
@@ -93,11 +94,15 @@ export class DesignerController {
       }
 
       const dto = await validateDto(CreateDesignerTaskDto, req.body);
-      const attachmentUrls = req.body.attachment_urls as string[] | undefined;
+
+      const filePaths = getFilePathsFromRequest(req, "designer_tasks");
+      const bodyAttachmentUrls = req.body.attachment_urls as string[] | undefined;
+      const mergedUrls = [...filePaths, ...(bodyAttachmentUrls || [])];
+
       const task = await designerService.createTask(
         {
           ...dto,
-          attachment_urls: attachmentUrls,
+          attachment_urls: mergedUrls.length > 0 ? mergedUrls : undefined,
         },
         req.user.id
       );
@@ -116,7 +121,16 @@ export class DesignerController {
 
       const id = req.params.id as string;
       const dto = await validateDto(UpdateDesignerTaskDto, req.body);
-      const task = await designerService.updateTask(id, dto, req.user);
+
+      const filePaths = getFilePathsFromRequest(req, "designer_tasks");
+      const bodyAttachmentUrls = req.body.attachment_urls as string[] | undefined;
+      const mergedUrls = [...filePaths, ...(bodyAttachmentUrls || [])];
+
+      const task = await designerService.updateTask(
+        id,
+        { ...dto, attachment_urls: mergedUrls.length > 0 ? mergedUrls : undefined },
+        req.user
+      );
       res.status(200).json({ success: true, data: task, message: "Designer task updated successfully" });
     } catch (error) {
       next(error);
@@ -191,16 +205,45 @@ export class DesignerController {
 
       const taskId = req.params.id as string;
       const dto = await validateDto(CreateDesignerSubmissionDto, req.body);
-      const attachmentUrls = req.body.attachment_urls as string[] | undefined;
+
+      const filePaths = getFilePathsFromRequest(req, "designer_submissions");
+      const bodyAttachmentUrls = req.body.attachment_urls as string[] | undefined;
+      const mergedUrls = [...filePaths, ...(bodyAttachmentUrls || [])];
 
       const submission = await designerService.createSubmission(
         taskId,
         req.user.id,
         dto.stage,
         dto.description,
-        attachmentUrls
+        mergedUrls.length > 0 ? mergedUrls : undefined
       );
       res.status(201).json({ success: true, data: submission, message: "Submission created successfully" });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async updateSubmission(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      if (!req.user) {
+        res.status(401).json({ success: false, message: "Unauthorized" });
+        return;
+      }
+
+      const submissionId = req.params.id as string;
+      const { description, stage } = req.body;
+
+      const filePaths = getFilePathsFromRequest(req, "designer_submissions");
+      const bodyAttachmentUrls = req.body.attachment_urls as string[] | undefined;
+      const mergedUrls = [...filePaths, ...(bodyAttachmentUrls || [])];
+
+      const submission = await designerService.updateSubmission(submissionId, {
+        description,
+        stage,
+        attachment_urls: mergedUrls.length > 0 ? mergedUrls : undefined,
+      });
+
+      res.status(200).json({ success: true, data: submission, message: "Submission updated successfully" });
     } catch (error) {
       next(error);
     }

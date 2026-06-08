@@ -28,6 +28,12 @@ interface VerifyParams {
   description?: string;
 }
 
+interface UpdateParams {
+  description?: string;
+  status?: ReviewOutcome;
+  attachment_urls?: string[];
+}
+
 export class PaidCustomerService {
   private repo = AppDataSource.getRepository(PaidCustomer);
   private customerRepo = AppDataSource.getRepository(Customer);
@@ -191,6 +197,60 @@ export class PaidCustomerService {
     return paidCustomer;
   }
 
+  async clarify(id: string, params: { description: string; attachment_urls?: string[] }, userId: string) {
+    const paidCustomer = await this.repo.findOne({
+      where: { id },
+      relations: ["customer"],
+    });
+    if (!paidCustomer) throw new AppError(404, "Paid customer not found");
+
+    const submission = new MarketingSubmission();
+    submission.paid_customer_id = id;
+    submission.description = params.description;
+    submission.attachment_urls = (params.attachment_urls ?? null) as any;
+    const saved = await this.submissionRepo.save(submission);
+
+    const customer = paidCustomer.customer;
+    await this.createNotifications(
+      [UserRole.MARKETING],
+      userId,
+      saved.id,
+      "clarification_requested",
+      customer?.id ?? paidCustomer.customer_id,
+      "customer",
+      `Clarification requested for "${customer?.customer_name || "customer"}"`
+    );
+
+    return saved;
+  }
+
+  async updateClarify(id: string, params: { description: string; attachment_urls?: string[] }, userId: string) {
+    const paidCustomer = await this.repo.findOne({
+      where: { id },
+      relations: ["customer"],
+    });
+    if (!paidCustomer) throw new AppError(404, "Paid customer not found");
+
+    const submission = new MarketingSubmission();
+    submission.paid_customer_id = id;
+    submission.description = params.description;
+    submission.attachment_urls = (params.attachment_urls ?? null) as any;
+    const saved = await this.submissionRepo.save(submission);
+
+    const customer = paidCustomer.customer;
+    await this.createNotifications(
+      [UserRole.FINANCE, UserRole.CEO],
+      userId,
+      saved.id,
+      "clarification_response",
+      customer?.id ?? paidCustomer.customer_id,
+      "customer",
+      `Clarification response for "${customer?.customer_name || "customer"}"`
+    );
+
+    return saved;
+  }
+
   async getVerificationHistory(id: string) {
     const paidCustomer = await this.repo.findOneBy({ id });
     if (!paidCustomer) {
@@ -215,6 +275,19 @@ export class PaidCustomerService {
     });
 
     return reviews;
+  }
+
+  async update(id: string, params: UpdateParams) {
+    const paidCustomer = await this.repo.findOneBy({ id });
+    if (!paidCustomer) {
+      throw new AppError(404, "Paid customer not found");
+    }
+
+    if (params.description !== undefined) paidCustomer.description = params.description;
+    if (params.status !== undefined) paidCustomer.status = params.status;
+    if (params.attachment_urls !== undefined) paidCustomer.attachment_urls = params.attachment_urls as any;
+
+    return this.repo.save(paidCustomer);
   }
 
   async createSubmission(paidCustomerId: string, description: string, attachmentUrls?: string[]) {

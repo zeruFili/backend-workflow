@@ -26,6 +26,7 @@ interface CreateTaskParams {
   description: string;
   assigned_to_user_id?: string;
   due_date?: string;
+  attachment_urls?: string[];
 }
 
 interface UpdateTaskParams {
@@ -35,6 +36,7 @@ interface UpdateTaskParams {
   task_state?: TaskState;
   due_date?: string;
   assigned_to_user_id?: string;
+  attachment_urls?: string[];
 }
 
 export class DataCollectorService {
@@ -123,6 +125,7 @@ export class DataCollectorService {
     task.due_date = params.due_date ?? null as any;
     task.status = DataCollectorTaskStatus.PENDING;
     task.task_state = TaskState.ACTIVE;
+    task.attachment_urls = (params.attachment_urls ?? null) as any;
 
     const saved = await this.taskRepo.save(task);
 
@@ -151,6 +154,7 @@ export class DataCollectorService {
     if (params.task_state !== undefined) task.task_state = params.task_state;
     if (params.due_date !== undefined) task.due_date = params.due_date as any;
     if (params.assigned_to_user_id !== undefined) task.assigned_to_user_id = params.assigned_to_user_id as any;
+    if (params.attachment_urls !== undefined) task.attachment_urls = params.attachment_urls as any;
     task.updated_by = userId as any;
 
     return this.taskRepo.save(task);
@@ -191,6 +195,19 @@ export class DataCollectorService {
     }
 
     return saved;
+  }
+
+  async updateSubmission(
+    submissionId: string,
+    params: { description?: string; attachment_urls?: string[] }
+  ) {
+    const submission = await this.submissionRepo.findOneBy({ id: submissionId });
+    if (!submission) throw new AppError(404, "Data collector submission not found");
+
+    if (params.description !== undefined) submission.description = params.description;
+    if (params.attachment_urls !== undefined) submission.attachment_urls = params.attachment_urls as any;
+
+    return this.submissionRepo.save(submission);
   }
 
   async getSubmissions(taskId: string) {

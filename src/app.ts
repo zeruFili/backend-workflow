@@ -16,6 +16,8 @@ import qsRoutes from "./routes/qs.routes";
 import notificationRoutes from "./routes/notification.routes";
 import dataCollectorRoutes from "./routes/data-collector.routes";
 import designerRoutes from "./routes/designer.routes";
+import ceoTransferRoutes from "./routes/ceo-transfer.routes";
+import fileRoutes from "./routes/file.routes";
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -29,10 +31,12 @@ app.use("/uploads", express.static(path.join(__dirname, "..", "uploads")));
 app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/users", userRoutes);
 app.use("/api/v1/paid-customers", paidCustomerRoutes);
+app.use("/api/v1", ceoTransferRoutes);
 app.use("/api/v1", qsRoutes);
 app.use("/api/v1", notificationRoutes);
 app.use("/api/v1", dataCollectorRoutes);
 app.use("/api/v1", designerRoutes);
+app.use("/api/v1/files", fileRoutes);
 
 app.use(notFound);
 app.use(errorHandler);

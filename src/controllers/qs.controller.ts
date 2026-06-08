@@ -4,6 +4,7 @@ import { plainToInstance } from "class-transformer";
 import { AuthRequest } from "../middlewares/auth.middleware";
 import { AppError } from "../middlewares/error.middleware";
 import { quantitySurveyorService } from "../services/qs.service";
+import { getFilePathsFromRequest } from "../utils/upload.utils";
 import {
   CreateQSTaskDto,
   UpdateQSTaskDto,
@@ -76,7 +77,14 @@ export class QuantitySurveyorController {
       }
 
       const dto = await validateDto(CreateQSTaskDto, req.body);
-      const task = await quantitySurveyorService.createTask(dto, req.user.id);
+
+      const filePaths = getFilePathsFromRequest(req, "qs_tasks");
+      const mergedUrls = [...filePaths, ...(dto.attachment_urls || [])];
+
+      const task = await quantitySurveyorService.createTask(
+        { ...dto, attachment_urls: mergedUrls.length > 0 ? mergedUrls : undefined },
+        req.user.id
+      );
       res.status(201).json({ success: true, data: task, message: "QS task created successfully" });
     } catch (error) {
       next(error);
@@ -87,7 +95,15 @@ export class QuantitySurveyorController {
     try {
       const id = req.params.id as string;
       const dto = await validateDto(UpdateQSTaskDto, req.body);
-      const task = await quantitySurveyorService.updateTask(id, dto);
+
+      const filePaths = getFilePathsFromRequest(req, "qs_tasks");
+      const bodyAttachmentUrls = req.body.attachment_urls as string[] | undefined;
+      const mergedUrls = [...filePaths, ...(bodyAttachmentUrls || [])];
+
+      const task = await quantitySurveyorService.updateTask(
+        id,
+        { ...dto, attachment_urls: mergedUrls.length > 0 ? mergedUrls : undefined }
+      );
       res.status(200).json({ success: true, data: task, message: "QS task updated successfully" });
     } catch (error) {
       next(error);
@@ -103,8 +119,17 @@ export class QuantitySurveyorController {
 
       const taskId = req.params.id as string;
       const dto = await validateDto(CreateQSSubmissionDto, req.body);
-      const attachmentUrls = req.body.attachment_urls as string[] | undefined;
-      const submission = await quantitySurveyorService.createSubmission(taskId, dto.description, req.user.id, attachmentUrls);
+
+      const filePaths = getFilePathsFromRequest(req, "qs_submissions");
+      const bodyAttachmentUrls = req.body.attachment_urls as string[] | undefined;
+      const mergedUrls = [...filePaths, ...(bodyAttachmentUrls || [])];
+
+      const submission = await quantitySurveyorService.createSubmission(
+        taskId,
+        dto.description,
+        req.user.id,
+        mergedUrls.length > 0 ? mergedUrls : undefined
+      );
       res.status(201).json({ success: true, data: submission, message: "Submission created successfully" });
     } catch (error) {
       next(error);
@@ -137,6 +162,85 @@ export class QuantitySurveyorController {
         dto.description
       );
       res.status(201).json({ success: true, data: review, message: "Review created successfully" });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async evaluate(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      if (!req.user) {
+        res.status(401).json({ success: false, message: "Unauthorized" });
+        return;
+      }
+
+      const id = req.params.id as string;
+      const { description, review_outcome } = req.body;
+
+      if (!description || !review_outcome) {
+        res.status(400).json({ success: false, message: "Description and review_outcome are required" });
+        return;
+      }
+
+      const filePaths = getFilePathsFromRequest(req, "qs_evaluations");
+      const bodyAttachmentUrls = req.body.attachment_urls as string[] | undefined;
+      const mergedUrls = [...filePaths, ...(bodyAttachmentUrls || [])];
+
+      const evaluation = await quantitySurveyorService.evaluate(id, {
+        description,
+        review_outcome,
+        attachment_urls: mergedUrls.length > 0 ? mergedUrls : undefined,
+      }, req.user.id);
+
+      res.status(201).json({ success: true, data: evaluation, message: "Evaluation created" });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async updateEvaluate(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      if (!req.user) {
+        res.status(401).json({ success: false, message: "Unauthorized" });
+        return;
+      }
+
+      const id = req.params.id as string;
+      const { description, review_outcome } = req.body;
+
+      const filePaths = getFilePathsFromRequest(req, "qs_evaluations");
+      const bodyAttachmentUrls = req.body.attachment_urls as string[] | undefined;
+      const mergedUrls = [...filePaths, ...(bodyAttachmentUrls || [])];
+
+      const evaluation = await quantitySurveyorService.updateEvaluate(id, {
+        description,
+        review_outcome,
+        attachment_urls: mergedUrls.length > 0 ? mergedUrls : undefined,
+      }, req.user.id);
+
+      res.status(200).json({ success: true, data: evaluation, message: "Evaluation updated" });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async decide(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      if (!req.user) {
+        res.status(401).json({ success: false, message: "Unauthorized" });
+        return;
+      }
+
+      const id = req.params.id as string;
+      const { decision, description } = req.body;
+
+      if (!decision) {
+        res.status(400).json({ success: false, message: "Decision is required" });
+        return;
+      }
+
+      const result = await quantitySurveyorService.decide(id, decision, description, req.user.id);
+      res.status(200).json({ success: true, data: result, message: "Decision recorded" });
     } catch (error) {
       next(error);
     }

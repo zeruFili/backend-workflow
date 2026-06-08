@@ -70,6 +70,11 @@ export class UpdateDesignerTaskDto {
   @IsOptional()
   @IsUUID()
   assigned_to_user_id?: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  attachment_urls?: string[];
 }
 
 export class AssignDesignerDto {

@@ -1,4 +1,4 @@
-import { IsString, IsOptional, Length, IsUUID, IsNumber, IsPositive } from "class-validator";
+import { IsString, IsOptional, Length, IsUUID, IsNumber, IsPositive, IsArray } from "class-validator";
 
 export class CreateCeoTransferDto {
   @IsUUID()
@@ -14,6 +14,11 @@ export class CreateCeoTransferDto {
   @IsNumber()
   @IsPositive()
   amount: number;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  attachment_urls?: string[];
 }
 
 export class UpdateCeoTransferDto {
@@ -34,4 +39,9 @@ export class UpdateCeoTransferDto {
   @IsNumber()
   @IsPositive()
   amount?: number;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  attachment_urls?: string[];
 }

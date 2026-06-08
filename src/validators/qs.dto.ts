@@ -1,4 +1,4 @@
-import { IsString, IsEnum, IsOptional, Length, IsUUID } from "class-validator";
+import { IsString, IsEnum, IsOptional, Length, IsUUID, IsArray } from "class-validator";
 import { ReviewOutcome } from "../enums/review-outcome.enum";
 
 export class CreateQSTaskDto {
@@ -15,6 +15,11 @@ export class CreateQSTaskDto {
 
   @IsString()
   due_date: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  attachment_urls?: string[];
 }
 
 export class UpdateQSTaskDto {
@@ -35,6 +40,11 @@ export class UpdateQSTaskDto {
   @IsOptional()
   @IsString()
   due_date?: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  attachment_urls?: string[];
 }
 
 export class CreateQSSubmissionDto {

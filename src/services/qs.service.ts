@@ -26,6 +26,7 @@ interface CreateTaskParams {
   description: string;
   assigned_to_user_id: string;
   due_date: string;
+  attachment_urls?: string[];
 }
 
 interface UpdateTaskParams {
@@ -33,6 +34,7 @@ interface UpdateTaskParams {
   description?: string;
   status?: ReviewOutcome;
   due_date?: string;
+  attachment_urls?: string[];
 }
 
 export class QuantitySurveyorService {
@@ -120,6 +122,7 @@ export class QuantitySurveyorService {
     task.due_date = params.due_date;
     task.status = ReviewOutcome.PENDING;
     task.task_state = TaskState.ACTIVE;
+    task.attachment_urls = (params.attachment_urls ?? null) as any;
 
     const saved = await this.taskRepo.save(task);
 
@@ -144,6 +147,7 @@ export class QuantitySurveyorService {
     if (params.description !== undefined) task.description = params.description;
     if (params.status !== undefined) task.status = params.status;
     if (params.due_date !== undefined) task.due_date = params.due_date;
+    if (params.attachment_urls !== undefined) task.attachment_urls = params.attachment_urls as any;
 
     return this.taskRepo.save(task);
   }
@@ -251,6 +255,80 @@ export class QuantitySurveyorService {
       relations: ["reviewer_user"],
       order: { created_at: "DESC" },
     });
+  }
+
+  async evaluate(
+    taskId: string,
+    params: { description: string; review_outcome: string; attachment_urls?: string[] },
+    userId: string
+  ) {
+    const task = await this.taskRepo.findOneBy({ id: taskId });
+    if (!task) throw new AppError(404, "Quantity surveyor task not found");
+
+    const submission = new QuantitySurveyorSubmission();
+    submission.quantity_surveyor_task_id = taskId;
+    submission.description = params.description;
+    submission.attachment_urls = (params.attachment_urls ?? null) as any;
+    submission.review_status = SubmissionReviewStatus.PENDING_REVIEW;
+    const savedSubmission = await this.submissionRepo.save(submission);
+
+    const review = new QuantitySurveyorReview();
+    review.quantity_surveyor_submission_id = savedSubmission.id;
+    review.reviewer_user_id = userId;
+    review.review_outcome = params.review_outcome as any;
+    review.description = params.description;
+    await this.reviewRepo.save(review);
+
+    return savedSubmission;
+  }
+
+  async updateEvaluate(
+    taskId: string,
+    params: { description?: string; review_outcome?: string; attachment_urls?: string[] },
+    userId: string
+  ) {
+    const task = await this.taskRepo.findOneBy({ id: taskId });
+    if (!task) throw new AppError(404, "Quantity surveyor task not found");
+
+    const submission = new QuantitySurveyorSubmission();
+    submission.quantity_surveyor_task_id = taskId;
+    submission.description = params.description || "Evaluation update";
+    submission.attachment_urls = (params.attachment_urls ?? null) as any;
+    submission.review_status = SubmissionReviewStatus.PENDING_REVIEW;
+    const savedSubmission = await this.submissionRepo.save(submission);
+
+    if (params.review_outcome) {
+      const review = new QuantitySurveyorReview();
+      review.quantity_surveyor_submission_id = savedSubmission.id;
+      review.reviewer_user_id = userId;
+      review.review_outcome = params.review_outcome as any;
+      review.description = params.description || "Evaluation update";
+      await this.reviewRepo.save(review);
+    }
+
+    return savedSubmission;
+  }
+
+  async decide(evaluationId: string, decision: string, description?: string, userId?: string) {
+    const submission = await this.submissionRepo.findOneBy({ id: evaluationId });
+    if (!submission) throw new AppError(404, "Evaluation not found");
+
+    const review = new QuantitySurveyorReview();
+    review.quantity_surveyor_submission_id = evaluationId;
+    review.reviewer_user_id = userId || "system";
+    review.review_outcome = decision as any;
+    review.description = description || `Decision: ${decision}`;
+    await this.reviewRepo.save(review);
+
+    if (decision === "APPROVED" || decision === "approved") {
+      const task = await this.taskRepo.findOneBy({ id: submission.quantity_surveyor_task_id });
+      if (task) {
+        task.status = ReviewOutcome.APPROVED;
+        await this.taskRepo.save(task);
+      }
+    }
+
+    return submission;
   }
 }
 

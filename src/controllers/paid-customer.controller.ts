@@ -4,9 +4,8 @@ import { plainToInstance } from "class-transformer";
 import { AuthRequest } from "../middlewares/auth.middleware";
 import { AppError } from "../middlewares/error.middleware";
 import { paidCustomerService } from "../services/paid-customer.service";
-import { CreatePaidCustomerDto, VerifyPaidCustomerDto } from "../validators/paid-customer.dto";
-import path from "path";
-import fs from "fs";
+import { CreatePaidCustomerDto, VerifyPaidCustomerDto, UpdatePaidCustomerDto } from "../validators/paid-customer.dto";
+import { getFilePathsFromRequest } from "../utils/upload.utils";
 
 async function validateDto<T extends object>(dtoClass: new () => T, plain: object): Promise<T> {
   const instance = plainToInstance(dtoClass, plain);
@@ -24,27 +23,6 @@ async function validateDto<T extends object>(dtoClass: new () => T, plain: objec
   }
 
   return instance;
-}
-
-function ensureUploadsDir(): string {
-  const dir = path.resolve(process.cwd(), "uploads", "paid_customer_attachments");
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-  }
-  return dir;
-}
-
-function extractAttachmentUrls(req: AuthRequest): string[] {
-  const files = (req as any).files as Express.Multer.File[] | undefined;
-  if (!files || files.length === 0) return [];
-
-  const uploadDir = ensureUploadsDir();
-
-  return files.map((file) => {
-    const destPath = path.join(uploadDir, `${Date.now()}-${file.originalname}`);
-    fs.writeFileSync(destPath, file.buffer);
-    return destPath;
-  });
 }
 
 export class PaidCustomerController {
@@ -93,14 +71,95 @@ export class PaidCustomerController {
         return;
       }
 
-      const attachmentUrls = extractAttachmentUrls(req);
+      const filePaths = getFilePathsFromRequest(req, "paid_customer_attachments");
 
       const result = await paidCustomerService.create({
         ...dto,
-        attachment_urls: attachmentUrls.length > 0 ? attachmentUrls : undefined,
+        attachment_urls: filePaths.length > 0 ? filePaths : undefined,
       }, req.user.id);
 
       res.status(201).json({ success: true, data: result, message: "Paid customer created" });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async update(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const id = req.params.id as string;
+      const dto = await validateDto(UpdatePaidCustomerDto, req.body);
+
+      if (!req.user) {
+        res.status(401).json({ success: false, message: "Unauthorized" });
+        return;
+      }
+
+      const filePaths = getFilePathsFromRequest(req, "paid_customer_attachments");
+      const bodyAttachmentUrls = req.body.attachment_urls as string[] | undefined;
+      const mergedUrls = [...filePaths, ...(bodyAttachmentUrls || [])];
+
+      const result = await paidCustomerService.update(id, {
+        ...dto,
+        attachment_urls: mergedUrls.length > 0 ? mergedUrls : undefined,
+      });
+
+      res.status(200).json({ success: true, data: result, message: "Paid customer updated" });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async clarify(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const id = req.params.id as string;
+      const { description } = req.body;
+
+      if (!req.user) {
+        res.status(401).json({ success: false, message: "Unauthorized" });
+        return;
+      }
+
+      if (!description || typeof description !== "string") {
+        res.status(400).json({ success: false, message: "Description is required" });
+        return;
+      }
+
+      const filePaths = getFilePathsFromRequest(req, "paid_customer_clarifications");
+
+      const result = await paidCustomerService.clarify(id, {
+        description,
+        attachment_urls: filePaths.length > 0 ? filePaths : undefined,
+      }, req.user.id);
+
+      res.status(201).json({ success: true, data: result, message: "Clarification request created" });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async updateClarify(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const id = req.params.id as string;
+      const { description } = req.body;
+
+      if (!req.user) {
+        res.status(401).json({ success: false, message: "Unauthorized" });
+        return;
+      }
+
+      if (!description || typeof description !== "string") {
+        res.status(400).json({ success: false, message: "Description is required" });
+        return;
+      }
+
+      const filePaths = getFilePathsFromRequest(req, "paid_customer_clarifications");
+
+      const result = await paidCustomerService.updateClarify(id, {
+        description,
+        attachment_urls: filePaths.length > 0 ? filePaths : undefined,
+      }, req.user.id);
+
+      res.status(200).json({ success: true, data: result, message: "Clarification response submitted" });
     } catch (error) {
       next(error);
     }

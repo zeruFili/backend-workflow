@@ -46,6 +46,7 @@ interface UpdateTaskParams {
   story_point?: number;
   due_date?: string;
   assigned_to_user_id?: string;
+  attachment_urls?: string[];
 }
 
 interface UpdateTaskActor {
@@ -280,6 +281,7 @@ export class DesignerService {
     if (params.story_point !== undefined) task.story_point = params.story_point;
     if (params.due_date !== undefined) task.due_date = params.due_date as any;
     if (params.assigned_to_user_id !== undefined) task.assigned_to_user_id = params.assigned_to_user_id as any;
+    if (params.attachment_urls !== undefined) task.attachment_urls = params.attachment_urls as any;
 
     if (currentUser.role === UserRole.CEO) {
       task.updated_by = currentUser.id as any;
@@ -475,6 +477,20 @@ export class DesignerService {
     }
 
     return saved;
+  }
+
+  async updateSubmission(
+    submissionId: string,
+    params: { description?: string; stage?: DesignerStage; attachment_urls?: string[] }
+  ) {
+    const submission = await this.submissionRepo.findOneBy({ id: submissionId });
+    if (!submission) throw new AppError(404, "Designer submission not found");
+
+    if (params.description !== undefined) submission.description = params.description;
+    if (params.stage !== undefined) submission.stage = params.stage;
+    if (params.attachment_urls !== undefined) submission.attachment_urls = params.attachment_urls as any;
+
+    return this.submissionRepo.save(submission);
   }
 
   async createSubmissionReview(

@@ -1,4 +1,4 @@
-import { IsString, IsEnum, IsOptional, Length, IsUUID } from "class-validator";
+import { IsString, IsEnum, IsOptional, Length, IsUUID, IsArray } from "class-validator";
 import { DataCollectorTaskStatus } from "../enums/data-collector-task-status.enum";
 import { ReviewOutcome } from "../enums/review-outcome.enum";
 import { TaskState } from "../enums/task-state.enum";
@@ -19,6 +19,11 @@ export class CreateDCTaskDto {
   @IsOptional()
   @IsString()
   due_date?: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  attachment_urls?: string[];
 }
 
 export class UpdateDCTaskDto {
@@ -47,6 +52,11 @@ export class UpdateDCTaskDto {
   @IsOptional()
   @IsUUID()
   assigned_to_user_id?: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  attachment_urls?: string[];
 }
 
 export class CreateDCSubmissionDto {
