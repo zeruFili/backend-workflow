@@ -82,19 +82,8 @@ export class AuthService {
     );
   }
 
-  async resetPassword(token: string, newPassword: string): Promise<void> {
-    let payload: { sub: string; purpose: string };
-    try {
-      payload = jwt.verify(token, JWT_SECRET) as { sub: string; purpose: string };
-    } catch {
-      throw new AppError(400, "Invalid or expired reset token");
-    }
-
-    if (payload.purpose !== "password_reset") {
-      throw new AppError(400, "Invalid or expired reset token");
-    }
-
-    const user = await userRepo().findOne({ where: { id: payload.sub } });
+  async resetPassword(userId: string, newPassword: string): Promise<void> {
+    const user = await userRepo().findOne({ where: { id: userId } });
     if (!user) {
       throw new AppError(404, "User not found");
     }

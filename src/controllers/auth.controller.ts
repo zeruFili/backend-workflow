@@ -54,7 +54,7 @@ export class AuthController {
     }
   }
 
-  async resetPassword(req: Request, res: Response): Promise<void> {
+  async resetPassword(req: AuthRequest, res: Response): Promise<void> {
     try {
       const dto = plainToInstance(ResetPasswordDto, req.body);
       const errors = await validate(dto);
@@ -64,7 +64,12 @@ export class AuthController {
         return;
       }
 
-      await authService.resetPassword(dto.token, dto.newPassword);
+      if (!req.user) {
+        res.status(401).json({ success: false, message: "Unauthorized" });
+        return;
+      }
+
+      await authService.resetPassword(req.user.id, dto.newPassword);
       res.status(200).json({ success: true, message: "Password has been reset successfully. Please log in." });
     } catch (err) {
       if (err instanceof AppError) {
