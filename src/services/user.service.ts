@@ -33,6 +33,11 @@ interface UpdateUserInput {
   is_active?: boolean;
 }
 
+interface UpdateUserStatusInput {
+  is_active: boolean;
+  role?: UserRole;
+}
+
 interface CurrentUser {
   id: string;
   role: UserRole;
@@ -60,8 +65,8 @@ export class UserService {
 
     if (role) {
       where.role = role;
-    }
-    if (is_active !== undefined) {
+      where.is_active = true;
+    } else if (is_active !== undefined) {
       where.is_active = is_active;
     }
 
@@ -195,6 +200,36 @@ export class UserService {
 
     user.is_active = false;
     await userRepo().save(user);
+  }
+
+  async updateStatus(
+    id: string,
+    dto: UpdateUserStatusInput,
+    currentUser: CurrentUser
+  ): Promise<Partial<User>> {
+    const user = await userRepo().findOne({ where: { id } });
+    if (!user) {
+      throw new AppError(404, "User not found");
+    }
+
+    const isSelf = id === currentUser.id;
+
+    if (dto.is_active === false && isSelf) {
+      throw new AppError(403, "Cannot deactivate your own account");
+    }
+
+    if (dto.role !== undefined && isSelf) {
+      throw new AppError(403, "Cannot change your own role");
+    }
+
+    user.is_active = dto.is_active;
+
+    if (dto.role !== undefined) {
+      user.role = dto.role;
+    }
+
+    const saved = await userRepo().save(user);
+    return sanitizeUser(saved);
   }
 }
 
