@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { authenticate, authorize } from "../middlewares/auth.middleware";
+import { authenticate, authorize, requireExactRole } from "../middlewares/auth.middleware";
 import { UserRole } from "../enums/user-role.enum";
 import { designerController } from "../controllers/designer.controller";
 
@@ -10,7 +10,12 @@ router.post("/designer-tasks", authenticate, authorize(UserRole.CEO, UserRole.GE
 router.get("/designer-tasks/:id", authenticate, (req, res, next) => designerController.findTaskById(req, res, next));
 router.patch("/designer-tasks/:id", authenticate, authorize(UserRole.CEO, UserRole.GENERAL_MANAGER), (req, res, next) => designerController.updateTask(req, res, next));
 router.post("/designer-tasks/:id/assign", authenticate, authorize(UserRole.CEO, UserRole.GENERAL_MANAGER), (req, res, next) => designerController.assignDesigner(req, res, next));
-router.post("/designer-tasks/:id/apply", authenticate, authorize(UserRole.DESIGNER), (req, res, next) => designerController.apply(req, res, next));
+router.post(
+	"/designer-tasks/:id/apply",
+	authenticate,
+	requireExactRole(UserRole.DESIGNER, "Only designers can apply for designer tasks"),
+	(req, res, next) => designerController.apply(req, res, next)
+);
 router.get("/designer-tasks/:id/applications", authenticate, authorize(UserRole.CEO, UserRole.GENERAL_MANAGER), (req, res, next) => designerController.listApplications(req, res, next));
 router.patch("/designer-applications/:id", authenticate, authorize(UserRole.CEO, UserRole.GENERAL_MANAGER), (req, res, next) => designerController.reviewApplication(req, res, next));
 router.get("/designer-tasks/:id/submissions", authenticate, (req, res, next) => designerController.getSubmissions(req, res, next));

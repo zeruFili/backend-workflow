@@ -59,3 +59,19 @@ export function authorize(...roles: UserRole[]) {
     next();
   };
 }
+
+export function requireExactRole(role: UserRole, message?: string) {
+  return (req: AuthRequest, res: Response, next: NextFunction): void => {
+    if (!req.user) {
+      res.status(401).json({ success: false, message: "Unauthorized" });
+      return;
+    }
+
+    if (req.user.role !== role) {
+      res.status(403).json({ success: false, message: message ?? "Forbidden" });
+      return;
+    }
+
+    next();
+  };
+}
