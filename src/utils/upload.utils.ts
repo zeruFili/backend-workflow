@@ -158,6 +158,73 @@ export function deleteFile(relativePath: string): boolean {
   }
 }
 
+export function processUploadedFiles(
+  req: Request,
+  res: Response,
+  options: UploadMiddlewareOptions
+): Promise<string[]> {
+  return new Promise((resolve, reject) => {
+    const {
+      fieldName = "attachmentFiles",
+      maxCount = 10,
+      subfolder,
+      allowedTypes = ALLOWED_MIME_TYPES,
+      fileSizeLimit = MAX_FILE_SIZE,
+    } = options;
+
+    const uploadDir = ensureUploadDir(subfolder);
+
+    const storage = multer.diskStorage({
+      destination: (_req, _file, cb) => cb(null, uploadDir),
+      filename: (_req, file, cb) => {
+        const uniqueFileName = generateUniqueFileName(file.originalname);
+        cb(null, uniqueFileName);
+      },
+    });
+
+    const upload = multer({
+      storage,
+      limits: { fileSize: fileSizeLimit },
+      fileFilter: (_req, file, cb) => {
+        if (allowedTypes.has(file.mimetype)) {
+          cb(null, true);
+        } else {
+          cb(new Error(`File type '${file.mimetype}' is not allowed`));
+        }
+      },
+    }).array(fieldName, maxCount);
+
+    upload(req, res, (err: any) => {
+      if (err) {
+        const files = req.files as Express.Multer.File[] | undefined;
+        if (files && files.length > 0) {
+          files.forEach((file) => {
+            try { fs.unlinkSync(file.path); } catch {}
+          });
+        }
+
+        if (err instanceof multer.MulterError) {
+          let message: string;
+          if (err.code === "LIMIT_FILE_SIZE") {
+            message = `File size exceeds the limit of ${Math.round(fileSizeLimit / 1048576)}MB`;
+          } else if (err.code === "LIMIT_FILE_COUNT") {
+            message = `Too many files. Maximum is ${maxCount}`;
+          } else if (err.code === "LIMIT_UNEXPECTED_FILE") {
+            message = `Unexpected file field. Use "${fieldName}"`;
+          } else {
+            message = err.message;
+          }
+          return reject(new Error(message));
+        }
+        return reject(err);
+      }
+
+      const filePaths = getFilePathsFromRequest(req, subfolder);
+      resolve(filePaths);
+    });
+  });
+}
+
 export function deleteFiles(relativePaths: string[]): void {
   for (const p of relativePaths) {
     deleteFile(p);

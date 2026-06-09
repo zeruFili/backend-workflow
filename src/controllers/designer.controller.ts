@@ -5,7 +5,7 @@ import { AuthRequest } from "../middlewares/auth.middleware";
 import { AppError } from "../middlewares/error.middleware";
 import { designerService } from "../services/designer.service";
 import { ReviewOutcome } from "../enums/review-outcome.enum";
-import { getFilePathsFromRequest } from "../utils/upload.utils";
+import { processUploadedFiles } from "../utils/upload.utils";
 import {
   CreateDesignerTaskDto,
   UpdateDesignerTaskDto,
@@ -93,9 +93,17 @@ export class DesignerController {
         return;
       }
 
-      const dto = await validateDto(CreateDesignerTaskDto, req.body);
+      const bodyForValidation = { ...req.body } as any;
+      if (bodyForValidation.story_point !== undefined) {
+        bodyForValidation.story_point = parseInt(bodyForValidation.story_point as any, 10);
+      }
+      const dto = await validateDto(CreateDesignerTaskDto, bodyForValidation);
 
-      const filePaths = getFilePathsFromRequest(req, "designer_tasks");
+      const filePaths = await processUploadedFiles(req, res, {
+        fieldName: "attachmentFiles",
+        maxCount: 10,
+        subfolder: "designer_tasks",
+      });
       const bodyAttachmentUrls = req.body.attachment_urls as string[] | undefined;
       const mergedUrls = [...filePaths, ...(bodyAttachmentUrls || [])];
 
@@ -120,9 +128,17 @@ export class DesignerController {
       }
 
       const id = req.params.id as string;
-      const dto = await validateDto(UpdateDesignerTaskDto, req.body);
+      const bodyForValidation = { ...req.body } as any;
+      if (bodyForValidation.story_point !== undefined) {
+        bodyForValidation.story_point = parseInt(bodyForValidation.story_point as any, 10);
+      }
+      const dto = await validateDto(UpdateDesignerTaskDto, bodyForValidation);
 
-      const filePaths = getFilePathsFromRequest(req, "designer_tasks");
+      const filePaths = await processUploadedFiles(req, res, {
+        fieldName: "attachmentFiles",
+        maxCount: 10,
+        subfolder: "designer_tasks",
+      });
       const bodyAttachmentUrls = req.body.attachment_urls as string[] | undefined;
       const mergedUrls = [...filePaths, ...(bodyAttachmentUrls || [])];
 
@@ -206,7 +222,11 @@ export class DesignerController {
       const taskId = req.params.id as string;
       const dto = await validateDto(CreateDesignerSubmissionDto, req.body);
 
-      const filePaths = getFilePathsFromRequest(req, "designer_submissions");
+      const filePaths = await processUploadedFiles(req, res, {
+        fieldName: "attachmentFiles",
+        maxCount: 10,
+        subfolder: "designer_submissions",
+      });
       const bodyAttachmentUrls = req.body.attachment_urls as string[] | undefined;
       const mergedUrls = [...filePaths, ...(bodyAttachmentUrls || [])];
 
@@ -233,7 +253,11 @@ export class DesignerController {
       const submissionId = req.params.id as string;
       const { description, stage } = req.body;
 
-      const filePaths = getFilePathsFromRequest(req, "designer_submissions");
+      const filePaths = await processUploadedFiles(req, res, {
+        fieldName: "attachmentFiles",
+        maxCount: 10,
+        subfolder: "designer_submissions",
+      });
       const bodyAttachmentUrls = req.body.attachment_urls as string[] | undefined;
       const mergedUrls = [...filePaths, ...(bodyAttachmentUrls || [])];
 

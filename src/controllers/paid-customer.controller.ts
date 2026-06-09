@@ -5,7 +5,7 @@ import { AuthRequest } from "../middlewares/auth.middleware";
 import { AppError } from "../middlewares/error.middleware";
 import { paidCustomerService } from "../services/paid-customer.service";
 import { CreatePaidCustomerDto, VerifyPaidCustomerDto, UpdatePaidCustomerDto } from "../validators/paid-customer.dto";
-import { getFilePathsFromRequest } from "../utils/upload.utils";
+import { processUploadedFiles } from "../utils/upload.utils";
 
 async function validateDto<T extends object>(dtoClass: new () => T, plain: object): Promise<T> {
   const instance = plainToInstance(dtoClass, plain);
@@ -71,7 +71,11 @@ export class PaidCustomerController {
         return;
       }
 
-      const filePaths = getFilePathsFromRequest(req, "paid_customer_attachments");
+      const filePaths = await processUploadedFiles(req, res, {
+        fieldName: "proofFiles",
+        maxCount: 5,
+        subfolder: "paid_customer_attachments",
+      });
 
       const result = await paidCustomerService.create({
         ...dto,
@@ -94,7 +98,11 @@ export class PaidCustomerController {
         return;
       }
 
-      const filePaths = getFilePathsFromRequest(req, "paid_customer_attachments");
+      const filePaths = await processUploadedFiles(req, res, {
+        fieldName: "proofFiles",
+        maxCount: 5,
+        subfolder: "paid_customer_attachments",
+      });
       const bodyAttachmentUrls = req.body.attachment_urls as string[] | undefined;
       const mergedUrls = [...filePaths, ...(bodyAttachmentUrls || [])];
 
@@ -124,7 +132,11 @@ export class PaidCustomerController {
         return;
       }
 
-      const filePaths = getFilePathsFromRequest(req, "paid_customer_clarifications");
+      const filePaths = await processUploadedFiles(req, res, {
+        fieldName: "attachmentFiles",
+        maxCount: 5,
+        subfolder: "paid_customer_clarifications",
+      });
 
       const result = await paidCustomerService.clarify(id, {
         description,
@@ -152,7 +164,11 @@ export class PaidCustomerController {
         return;
       }
 
-      const filePaths = getFilePathsFromRequest(req, "paid_customer_clarifications");
+      const filePaths = await processUploadedFiles(req, res, {
+        fieldName: "attachmentFiles",
+        maxCount: 5,
+        subfolder: "paid_customer_clarifications",
+      });
 
       const result = await paidCustomerService.updateClarify(id, {
         description,

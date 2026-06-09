@@ -5,7 +5,7 @@ import { AuthRequest } from "../middlewares/auth.middleware";
 import { AppError } from "../middlewares/error.middleware";
 import { ceoTransferService } from "../services/ceo-transfer.service";
 import { CreateCeoTransferDto, UpdateCeoTransferDto } from "../validators/ceo-transfer.dto";
-import { getFilePathsFromRequest } from "../utils/upload.utils";
+import { processUploadedFiles } from "../utils/upload.utils";
 
 async function validateDto<T extends object>(dtoClass: new () => T, plain: object): Promise<T> {
   const instance = plainToInstance(dtoClass, plain);
@@ -57,7 +57,11 @@ export class CeoTransferController {
 
       const dto = await validateDto(CreateCeoTransferDto, req.body);
 
-      const filePaths = getFilePathsFromRequest(req, "ceo_transfers");
+      const filePaths = await processUploadedFiles(req, res, {
+        fieldName: "attachmentFiles",
+        maxCount: 10,
+        subfolder: "ceo_transfers",
+      });
       const mergedUrls = [...filePaths, ...(dto.attachment_urls || [])];
 
       const result = await ceoTransferService.create(
@@ -81,7 +85,11 @@ export class CeoTransferController {
       const id = req.params.id as string;
       const dto = await validateDto(UpdateCeoTransferDto, req.body);
 
-      const filePaths = getFilePathsFromRequest(req, "ceo_transfers");
+      const filePaths = await processUploadedFiles(req, res, {
+        fieldName: "attachmentFiles",
+        maxCount: 10,
+        subfolder: "ceo_transfers",
+      });
       const bodyAttachmentUrls = req.body.attachment_urls as string[] | undefined;
       const mergedUrls = [...filePaths, ...(bodyAttachmentUrls || [])];
 
