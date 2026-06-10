@@ -75,6 +75,21 @@ export class QuantitySurveyorService {
     return this.notificationRepo.save(n);
   }
 
+  private async refreshResourceNotifications(resourceId: string, fromUserId: string) {
+    const notifications = await this.notificationRepo.find({
+      where: { resource_id: resourceId },
+    });
+
+    for (const n of notifications) {
+      n.viewed = false;
+      n.from_user_id = fromUserId;
+    }
+
+    if (notifications.length > 0) {
+      await this.notificationRepo.save(notifications);
+    }
+  }
+
   async findAllTasks(params: PaginatedParams) {
     const { page, limit, status, assignedTo, search, currentUser } = params;
 
@@ -149,7 +164,7 @@ export class QuantitySurveyorService {
     return saved;
   }
 
-  async updateTask(id: string, params: UpdateTaskParams) {
+  async updateTask(id: string, params: UpdateTaskParams, userId: string) {
     const task = await this.taskRepo.findOneBy({ id });
     if (!task) throw new AppError(404, "Quantity surveyor task not found");
 
@@ -161,7 +176,11 @@ export class QuantitySurveyorService {
       task.attachment_urls = syncAttachments(task.attachment_urls, params.attachment_urls) as any;
     }
 
-    return this.taskRepo.save(task);
+    const saved = await this.taskRepo.save(task);
+
+    await this.refreshResourceNotifications(id, userId);
+
+    return saved;
   }
 
   async createSubmission(taskId: string, description: string, userId: string, attachmentUrls?: string[]) {
@@ -217,6 +236,7 @@ export class QuantitySurveyorService {
 
   async updateSubmission(
     submissionId: string,
+    userId: string,
     params: { description?: string; attachment_urls?: string[] }
   ) {
     const submission = await this.submissionRepo.findOne({
@@ -236,6 +256,8 @@ export class QuantitySurveyorService {
       submission.quantity_surveyor_task.status = ReviewOutcome.PENDING;
       await this.taskRepo.save(submission.quantity_surveyor_task);
     }
+
+    await this.refreshResourceNotifications(submissionId, userId);
 
     return saved;
   }

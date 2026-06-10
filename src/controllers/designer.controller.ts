@@ -249,7 +249,7 @@ export class DesignerController {
       const hasAttachments = filePaths.length > 0 || bodyAttachmentUrls !== undefined;
       const mergedUrls = hasAttachments ? [...filePaths, ...(bodyAttachmentUrls || [])] : undefined;
 
-      const submission = await designerService.updateSubmission(submissionId, {
+      const submission = await designerService.updateSubmission(submissionId, req.user.id, {
         description,
         stage,
         attachment_urls: mergedUrls,

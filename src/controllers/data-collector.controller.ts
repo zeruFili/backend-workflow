@@ -161,7 +161,7 @@ export class DataCollectorController {
       const hasAttachments = filePaths.length > 0 || bodyAttachmentUrls !== undefined;
       const mergedUrls = hasAttachments ? [...filePaths, ...(bodyAttachmentUrls || [])] : undefined;
 
-      const submission = await dataCollectorService.updateSubmission(submissionId, {
+      const submission = await dataCollectorService.updateSubmission(submissionId, req.user.id, {
         description,
         attachment_urls: mergedUrls,
       });

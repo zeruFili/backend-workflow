@@ -111,6 +111,21 @@ export class DesignerService {
     return this.notificationRepo.save(n);
   }
 
+  private async refreshResourceNotifications(resourceId: string, fromUserId: string) {
+    const notifications = await this.notificationRepo.find({
+      where: { resource_id: resourceId },
+    });
+
+    for (const n of notifications) {
+      n.viewed = false;
+      n.from_user_id = fromUserId;
+    }
+
+    if (notifications.length > 0) {
+      await this.notificationRepo.save(notifications);
+    }
+  }
+
   private summarizeAssignedByUser(user?: User | null): AssignedByUserSummary | null {
     if (!user) {
       return null;
@@ -292,7 +307,11 @@ export class DesignerService {
       task.updated_by = currentUser.id as any;
     }
 
-    return this.taskRepo.save(task);
+    const saved = await this.taskRepo.save(task);
+
+    await this.refreshResourceNotifications(id, currentUser.id);
+
+    return saved;
   }
 
   async assignDesigner(taskId: string, designerUserId: string, assignedByUserId: string) {
@@ -491,6 +510,7 @@ export class DesignerService {
 
   async updateSubmission(
     submissionId: string,
+    userId: string,
     params: { description?: string; stage?: DesignerStage; attachment_urls?: string[] }
   ) {
     const submission = await this.submissionRepo.findOne({
@@ -511,6 +531,8 @@ export class DesignerService {
       submission.designer_task.status = ReviewOutcome.PENDING;
       await this.taskRepo.save(submission.designer_task);
     }
+
+    await this.refreshResourceNotifications(submissionId, userId);
 
     return saved;
   }
@@ -603,8 +625,6 @@ export class DesignerService {
     const task = submission.designer_task;
     if (!task) throw new AppError(404, "Associated designer task not found");
 
-    const newOutcome = params.review_outcome ?? review.review_outcome;
-
     if (params.review_outcome !== undefined) {
       review.review_outcome = params.review_outcome;
       task.status = params.review_outcome;
@@ -617,40 +637,7 @@ export class DesignerService {
 
     const saved = await this.submissionReviewRepo.save(review);
 
-    await this.notificationRepo.update(
-      { parent_id: taskId, viewed: false },
-      { viewed: true }
-    );
-
-    const recipientIds = new Set<string>();
-
-    if (task.assigned_to_user_id) {
-      recipientIds.add(task.assigned_to_user_id);
-    }
-
-    const ceoGm = await this.userRepo.find({
-      where: [
-        { role: UserRole.CEO, is_active: true },
-        { role: UserRole.GENERAL_MANAGER, is_active: true },
-      ],
-    });
-
-    for (const user of ceoGm) {
-      recipientIds.add(user.id);
-    }
-
-    for (const recipientId of recipientIds) {
-      if (recipientId === reviewerUserId) continue;
-      await this.createNotification({
-        user_id: recipientId,
-        from_user_id: reviewerUserId,
-        resource_id: saved.id,
-        resource_type: ResourceType.REVIEW,
-        parent_id: taskId,
-        parent_type: ParentType.DESIGNER_TASK,
-        type: `Submission review updated to ${newOutcome}`,
-      });
-    }
+    await this.refreshResourceNotifications(reviewId, reviewerUserId);
 
     return saved;
   }

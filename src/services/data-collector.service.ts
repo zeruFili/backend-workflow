@@ -78,6 +78,21 @@ export class DataCollectorService {
     return this.notificationRepo.save(n);
   }
 
+  private async refreshResourceNotifications(resourceId: string, fromUserId: string) {
+    const notifications = await this.notificationRepo.find({
+      where: { resource_id: resourceId },
+    });
+
+    for (const n of notifications) {
+      n.viewed = false;
+      n.from_user_id = fromUserId;
+    }
+
+    if (notifications.length > 0) {
+      await this.notificationRepo.save(notifications);
+    }
+  }
+
   async findAllTasks(params: PaginatedParams) {
     const { page, limit, status, assignedTo, search, currentUser } = params;
 
@@ -173,7 +188,11 @@ export class DataCollectorService {
     }
     task.updated_by = userId as any;
 
-    return this.taskRepo.save(task);
+    const saved = await this.taskRepo.save(task);
+
+    await this.refreshResourceNotifications(id, userId);
+
+    return saved;
   }
 
   async createSubmission(taskId: string, description: string, userId: string, attachmentUrls?: string[]) {
@@ -218,6 +237,7 @@ export class DataCollectorService {
 
   async updateSubmission(
     submissionId: string,
+    userId: string,
     params: { description?: string; attachment_urls?: string[] }
   ) {
     const submission = await this.submissionRepo.findOne({
@@ -237,6 +257,8 @@ export class DataCollectorService {
       submission.data_collector_task.status = DataCollectorTaskStatus.PENDING;
       await this.taskRepo.save(submission.data_collector_task);
     }
+
+    await this.refreshResourceNotifications(submissionId, userId);
 
     return saved;
   }
@@ -350,45 +372,7 @@ export class DataCollectorService {
       await this.taskRepo.save(task);
     }
 
-    await this.notificationRepo
-      .createQueryBuilder()
-      .update(Notification)
-      .set({ viewed: true })
-      .where("parent_id = :taskId", { taskId })
-      .andWhere("resource_type = :resourceType", { resourceType: ResourceType.REVIEW })
-      .andWhere("viewed = false")
-      .execute();
-
-    const ceoGmUsers = await this.userRepo.find({
-      where: [
-        { role: UserRole.CEO, is_active: true },
-        { role: UserRole.GENERAL_MANAGER, is_active: true },
-      ],
-    });
-
-    const notifyUserIds = new Set<string>();
-    for (const u of ceoGmUsers) {
-      if (u.id !== currentUserId) {
-        notifyUserIds.add(u.id);
-      }
-    }
-
-    const dataCollectorUserId = task?.assigned_to_user_id;
-    if (dataCollectorUserId && dataCollectorUserId !== currentUserId) {
-      notifyUserIds.add(dataCollectorUserId);
-    }
-
-    for (const userId of notifyUserIds) {
-      await this.createNotification({
-        user_id: userId,
-        from_user_id: currentUserId,
-        resource_id: saved.id,
-        resource_type: ResourceType.REVIEW,
-        parent_id: taskId,
-        parent_type: ParentType.DATA_COLLECTOR_TASK,
-        type: `Review updated: ${saved.review_outcome}`,
-      });
-    }
+    await this.refreshResourceNotifications(reviewId, currentUserId);
 
     return saved;
   }
