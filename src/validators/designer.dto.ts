@@ -153,3 +153,33 @@ export class PauseTaskDto {
   @Length(1, 5000)
   reason: string;
 }
+
+export class UpdateTaskReviewDto {
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(5)
+  Creativity?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(5)
+  Timeliness?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(5)
+  Rendering_quality?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(5)
+  Client_understanding?: number;
+
+  @IsOptional()
+  @IsString()
+  description?: string;
+}

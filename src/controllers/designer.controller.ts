@@ -14,6 +14,7 @@ import {
   CreateSubmissionReviewDto,
   UpdateSubmissionReviewDto,
   CreateTaskReviewDto,
+  UpdateTaskReviewDto,
   DesignApplicationDto,
   PauseTaskDto,
 } from "../validators/designer.dto";
@@ -321,6 +322,33 @@ export class DesignerController {
         dto.description
       );
       res.status(201).json({ success: true, data: review, message: "Task review created successfully" });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async updateTaskReview(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      if (!req.user) {
+        res.status(401).json({ success: false, message: "Unauthorized" });
+        return;
+      }
+
+      const reviewId = req.params.id as string;
+      const dto = await validateDto(UpdateTaskReviewDto, req.body, req);
+      const review = await designerService.updateTaskReview(
+        reviewId,
+        req.user.id,
+        req.user.role,
+        {
+          creativity: dto.Creativity,
+          timeliness: dto.Timeliness,
+          renderingQuality: dto.Rendering_quality,
+          clientUnderstanding: dto.Client_understanding,
+          description: dto.description,
+        }
+      );
+      res.status(200).json({ success: true, data: review, message: "Task review updated successfully" });
     } catch (error) {
       next(error);
     }

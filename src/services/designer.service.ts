@@ -696,6 +696,93 @@ export class DesignerService {
     return saved;
   }
 
+  async updateTaskReview(
+    reviewId: string,
+    currentUserId: string,
+    currentUserRole: UserRole,
+    params: { creativity?: number; timeliness?: number; renderingQuality?: number; clientUnderstanding?: number; description?: string }
+  ) {
+    const review = await this.taskReviewRepo.findOne({
+      where: { id: reviewId },
+      relations: ["designer_task"],
+    });
+    if (!review) throw new AppError(404, "Designer task review not found");
+
+    if (currentUserRole !== UserRole.CEO && review.reviewer_user_id !== currentUserId) {
+      throw new AppError(403, "You are not authorized to update this rating.");
+    }
+
+    const daysSinceCreation = (Date.now() - review.created_at.getTime()) / (1000 * 60 * 60 * 24);
+    if (daysSinceCreation > 7) {
+      throw new AppError(400, "This rating can no longer be updated. Ratings may only be modified within 7 days of creation.");
+    }
+
+    if (params.creativity !== undefined) review.creativity = params.creativity;
+    if (params.timeliness !== undefined) review.timeliness = params.timeliness;
+    if (params.renderingQuality !== undefined) review.rendering_quality = params.renderingQuality;
+    if (params.clientUnderstanding !== undefined) review.client_understanding = params.clientUnderstanding;
+    if (params.description !== undefined) review.description = params.description;
+
+    if (currentUserRole === UserRole.CEO) {
+      review.reviewer_user_id = currentUserId;
+    }
+
+    const saved = await this.taskReviewRepo.save(review);
+
+    const task = review.designer_task;
+
+    const notifications = await this.notificationRepo.find({
+      where: { resource_id: reviewId },
+    });
+
+    for (const n of notifications) {
+      n.viewed = false;
+      n.from_user_id = currentUserId;
+      n.updated_at = new Date();
+    }
+
+    if (notifications.length > 0) {
+      await this.notificationRepo.save(notifications);
+    }
+
+    const existingRecipientIds = new Set(notifications.map((n) => n.user_id));
+
+    const ceoGm = await this.userRepo.find({
+      where: [
+        { role: UserRole.CEO, is_active: true },
+        { role: UserRole.GENERAL_MANAGER, is_active: true },
+      ],
+    });
+
+    for (const user of ceoGm) {
+      if (user.id === currentUserId) continue;
+      if (existingRecipientIds.has(user.id)) continue;
+      await this.createNotification({
+        user_id: user.id,
+        from_user_id: currentUserId,
+        resource_id: saved.id,
+        resource_type: ResourceType.RATE,
+        parent_id: review.designer_task_id,
+        parent_type: ParentType.DESIGNER_TASK,
+        type: "A designer task rating has been updated",
+      });
+    }
+
+    if (task?.assigned_to_user_id && task.assigned_to_user_id !== currentUserId && !existingRecipientIds.has(task.assigned_to_user_id)) {
+      await this.createNotification({
+        user_id: task.assigned_to_user_id,
+        from_user_id: currentUserId,
+        resource_id: saved.id,
+        resource_type: ResourceType.RATE,
+        parent_id: review.designer_task_id,
+        parent_type: ParentType.DESIGNER_TASK,
+        type: "Your task rating has been updated",
+      });
+    }
+
+    return saved;
+  }
+
   async getSubmissions(taskId: string) {
     const task = await this.taskRepo.findOneBy({ id: taskId });
     if (!task) throw new AppError(404, "Designer task not found");
