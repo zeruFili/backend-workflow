@@ -55,8 +55,8 @@ router.get("/designer-submissions/:id/reviews", authenticate, (req, res, next) =
 router.post("/designer-submissions/:id/review", authenticate, authorize(UserRole.CEO, UserRole.GENERAL_MANAGER), (req, res, next) => designerController.createSubmissionReview(req, res, next));
 router.patch("/designer-submission-reviews/:id", authenticate, authorize(UserRole.CEO, UserRole.GENERAL_MANAGER), (req, res, next) => designerController.updateSubmissionReview(req, res, next));
 router.post("/designer-tasks/:id/review", authenticate, authorize(UserRole.CEO, UserRole.GENERAL_MANAGER), (req, res, next) => designerController.createTaskReview(req, res, next));
-router.post("/designer-tasks/:id/pause", authenticate, authorize(UserRole.CEO, UserRole.GENERAL_MANAGER), (req, res, next) => designerController.pauseTask(req, res, next));
-router.post("/designer-tasks/:id/resume", authenticate, authorize(UserRole.CEO, UserRole.GENERAL_MANAGER), (req, res, next) => designerController.resumeTask(req, res, next));
+router.post("/designer-tasks/:id/pause", authenticate, authorize(UserRole.DESIGNER), (req, res, next) => designerController.pauseTask(req, res, next));
+router.post("/designer-tasks/:id/resume", authenticate, authorize(UserRole.DESIGNER), (req, res, next) => designerController.resumeTask(req, res, next));
 router.delete("/designer-tasks/:id", authenticate, authorize(UserRole.CEO), (req, res, next) => designerController.removeTask(req, res, next));
 
 export default router;

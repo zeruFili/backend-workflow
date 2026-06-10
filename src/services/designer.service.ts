@@ -658,6 +658,18 @@ export class DesignerService {
     const task = await this.taskRepo.findOneBy({ id: taskId });
     if (!task) throw new AppError(404, "Designer task not found");
 
+    if (task.stage !== DesignerStage.FINAL_STAGE || task.status !== ReviewOutcome.APPROVED) {
+      throw new AppError(
+        400,
+        "A designer's performance can only be rated after the task reaches the final stage and has been approved."
+      );
+    }
+
+    const existingReview = await this.taskReviewRepo.findOneBy({ designer_task_id: taskId });
+    if (existingReview) {
+      throw new AppError(409, "This designer task has already been rated and cannot be rated again.");
+    }
+
     const review = new DesignerTaskReview();
     review.designer_task_id = taskId;
     review.reviewer_user_id = reviewerUserId;
@@ -718,6 +730,10 @@ export class DesignerService {
       throw new AppError(409, "Task is already paused");
     }
 
+    if (task.assigned_to_user_id !== userId) {
+      throw new AppError(403, "Only the assigned designer can pause this task");
+    }
+
     const pausedTask = new PausedTask();
     pausedTask.designer_task_id = taskId;
     pausedTask.reason = reason;
@@ -747,6 +763,10 @@ export class DesignerService {
 
     if (!task.is_paused) {
       throw new AppError(409, "Task is not paused");
+    }
+
+    if (task.assigned_to_user_id !== userId) {
+      throw new AppError(403, "Only the assigned designer can resume this task");
     }
 
     const pausedTask = await this.pausedTaskRepo.findOne({
