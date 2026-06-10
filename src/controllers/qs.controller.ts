@@ -148,6 +148,32 @@ export class QuantitySurveyorController {
     }
   }
 
+  async updateSubmission(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      if (!req.user) {
+        res.status(401).json({ success: false, message: "Unauthorized" });
+        return;
+      }
+
+      const submissionId = req.params.id as string;
+      const { description } = req.body;
+
+      const filePaths = getFilePathsFromRequest(req, "qs_submissions");
+      const bodyAttachmentUrls = req.body.attachment_urls as string[] | undefined;
+      const hasAttachments = filePaths.length > 0 || bodyAttachmentUrls !== undefined;
+      const mergedUrls = hasAttachments ? [...filePaths, ...(bodyAttachmentUrls || [])] : undefined;
+
+      const submission = await quantitySurveyorService.updateSubmission(submissionId, {
+        description,
+        attachment_urls: mergedUrls,
+      });
+
+      res.status(200).json({ success: true, data: submission, message: "Submission updated successfully" });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async createReview(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
       if (!req.user) {

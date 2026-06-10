@@ -10,6 +10,7 @@ import {
   UpdateDCTaskDto,
   CreateDCSubmissionDto,
   CreateDCReviewDto,
+  UpdateDCReviewDto,
 } from "../validators/data-collector.dto";
 
 async function validateDto<T extends object>(dtoClass: new () => T, plain: object, req: AuthRequest): Promise<T> {
@@ -197,6 +198,26 @@ export class DataCollectorController {
         dto.description
       );
       res.status(201).json({ success: true, data: review, message: "Review created successfully" });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async updateReview(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      if (!req.user) {
+        res.status(401).json({ success: false, message: "Unauthorized" });
+        return;
+      }
+
+      const reviewId = req.params.id as string;
+      const dto = await validateDto(UpdateDCReviewDto, req.body, req);
+      const review = await dataCollectorService.updateReview(
+        reviewId,
+        { review_outcome: dto.review_outcome, description: dto.description },
+        req.user.id
+      );
+      res.status(200).json({ success: true, data: review, message: "Review updated successfully" });
     } catch (error) {
       next(error);
     }

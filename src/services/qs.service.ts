@@ -180,6 +180,9 @@ export class QuantitySurveyorService {
 
     const saved = await this.submissionRepo.save(submission);
 
+    task.status = ReviewOutcome.PENDING;
+    await this.taskRepo.save(task);
+
     const ceoGm = await this.userRepo.find({
       where: [
         { role: UserRole.CEO, is_active: true },
@@ -210,6 +213,31 @@ export class QuantitySurveyorService {
       where: { quantity_surveyor_task_id: taskId },
       order: { created_at: "DESC" },
     });
+  }
+
+  async updateSubmission(
+    submissionId: string,
+    params: { description?: string; attachment_urls?: string[] }
+  ) {
+    const submission = await this.submissionRepo.findOne({
+      where: { id: submissionId },
+      relations: ["quantity_surveyor_task"],
+    });
+    if (!submission) throw new AppError(404, "Quantity surveyor submission not found");
+
+    if (params.description !== undefined) submission.description = params.description;
+    if (params.attachment_urls !== undefined) {
+      submission.attachment_urls = syncAttachments(submission.attachment_urls, params.attachment_urls) as any;
+    }
+
+    const saved = await this.submissionRepo.save(submission);
+
+    if (submission.quantity_surveyor_task) {
+      submission.quantity_surveyor_task.status = ReviewOutcome.PENDING;
+      await this.taskRepo.save(submission.quantity_surveyor_task);
+    }
+
+    return saved;
   }
 
   async createReview(

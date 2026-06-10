@@ -86,9 +86,12 @@ export class DataCollectorService {
       .leftJoinAndSelect("t.assigned_by_user", "assigned_by_user")
       .leftJoinAndSelect("t.updated_by_user", "updated_by_user");
 
-    const isDataCollector = currentUser.role === UserRole.DATA_COLLECTOR;
-    if (isDataCollector) {
+    if (currentUser.role === UserRole.CEO || currentUser.role === UserRole.GENERAL_MANAGER) {
+      // CEO and GM see all tasks
+    } else if (currentUser.role === UserRole.DATA_COLLECTOR) {
       qb.andWhere("t.assigned_to_user_id = :userId", { userId: currentUser.id });
+    } else {
+      throw new AppError(403, "You are not authorized to view data collector tasks.");
     }
 
     if (status) qb.andWhere("t.status = :status", { status });
@@ -188,6 +191,9 @@ export class DataCollectorService {
 
     const saved = await this.submissionRepo.save(submission);
 
+    task.status = DataCollectorTaskStatus.PENDING;
+    await this.taskRepo.save(task);
+
     const ceoGm = await this.userRepo.find({
       where: [
         { role: UserRole.CEO, is_active: true },
@@ -214,7 +220,10 @@ export class DataCollectorService {
     submissionId: string,
     params: { description?: string; attachment_urls?: string[] }
   ) {
-    const submission = await this.submissionRepo.findOneBy({ id: submissionId });
+    const submission = await this.submissionRepo.findOne({
+      where: { id: submissionId },
+      relations: ["data_collector_task"],
+    });
     if (!submission) throw new AppError(404, "Data collector submission not found");
 
     if (params.description !== undefined) submission.description = params.description;
@@ -222,7 +231,14 @@ export class DataCollectorService {
       submission.attachment_urls = syncAttachments(submission.attachment_urls, params.attachment_urls) as any;
     }
 
-    return this.submissionRepo.save(submission);
+    const saved = await this.submissionRepo.save(submission);
+
+    if (submission.data_collector_task) {
+      submission.data_collector_task.status = DataCollectorTaskStatus.PENDING;
+      await this.taskRepo.save(submission.data_collector_task);
+    }
+
+    return saved;
   }
 
   async getSubmissions(taskId: string) {
@@ -274,6 +290,103 @@ export class DataCollectorService {
         parent_id: task.id,
         parent_type: ParentType.DATA_COLLECTOR_TASK,
         type: `Submission ${reviewOutcome}`,
+      });
+    }
+
+    return saved;
+  }
+
+  async updateReview(
+    reviewId: string,
+    params: { review_outcome?: ReviewOutcome; description?: string },
+    currentUserId: string
+  ) {
+    const review = await this.reviewRepo.findOne({
+      where: { id: reviewId },
+      relations: ["data_collector_submission"],
+    });
+    if (!review) throw new AppError(404, "Data collector review not found");
+
+    if (review.reviewer_user_id !== currentUserId) {
+      throw new AppError(403, "Only the original reviewer can update this review.");
+    }
+
+    const submission = review.data_collector_submission;
+    if (!submission) throw new AppError(404, "Associated submission not found");
+
+    const taskId = submission.data_collector_task_id;
+
+    const latestSubmission = await this.submissionRepo.findOne({
+      where: { data_collector_task_id: taskId },
+      order: { created_at: "DESC" },
+    });
+
+    if (latestSubmission && latestSubmission.id !== submission.id) {
+      throw new AppError(400, "A newer submission exists for this task. Cannot update review.");
+    }
+
+    const twentyFourHours = 24 * 60 * 60 * 1000;
+    const reviewAge = Date.now() - review.created_at.getTime();
+    if (reviewAge > twentyFourHours) {
+      throw new AppError(400, "Reviews can only be updated within 24 hours of creation.");
+    }
+
+    if (params.review_outcome !== undefined) {
+      review.review_outcome = params.review_outcome;
+    }
+    if (params.description !== undefined) {
+      review.description = params.description;
+    }
+
+    const saved = await this.reviewRepo.save(review);
+
+    const task = await this.taskRepo.findOneBy({ id: taskId });
+    if (task && params.review_outcome !== undefined) {
+      const mappedStatus = params.review_outcome === ReviewOutcome.APPROVED
+        ? DataCollectorTaskStatus.APPROVE
+        : params.review_outcome as unknown as DataCollectorTaskStatus;
+      task.status = mappedStatus;
+      task.updated_by = currentUserId as any;
+      await this.taskRepo.save(task);
+    }
+
+    await this.notificationRepo
+      .createQueryBuilder()
+      .update(Notification)
+      .set({ viewed: true })
+      .where("parent_id = :taskId", { taskId })
+      .andWhere("resource_type = :resourceType", { resourceType: ResourceType.REVIEW })
+      .andWhere("viewed = false")
+      .execute();
+
+    const ceoGmUsers = await this.userRepo.find({
+      where: [
+        { role: UserRole.CEO, is_active: true },
+        { role: UserRole.GENERAL_MANAGER, is_active: true },
+      ],
+    });
+
+    const notifyUserIds = new Set<string>();
+    for (const u of ceoGmUsers) {
+      if (u.id !== currentUserId) {
+        notifyUserIds.add(u.id);
+      }
+    }
+
+    const dataCollectorUserId = task?.assigned_to_user_id;
+    if (dataCollectorUserId && dataCollectorUserId !== currentUserId) {
+      notifyUserIds.add(dataCollectorUserId);
+    }
+
+    for (const userId of notifyUserIds) {
+      await this.createNotification({
+        user_id: userId,
+        from_user_id: currentUserId,
+        resource_id: saved.id,
+        resource_type: ResourceType.REVIEW,
+        parent_id: taskId,
+        parent_type: ParentType.DATA_COLLECTOR_TASK,
+        type: `Review updated: ${saved.review_outcome}`,
       });
     }
 

@@ -463,6 +463,7 @@ export class DesignerService {
 
     const saved = await this.submissionRepo.save(submission);
 
+    task.status = ReviewOutcome.PENDING;
     task.stage = resolvedStage;
     await this.taskRepo.save(task);
 
@@ -492,7 +493,10 @@ export class DesignerService {
     submissionId: string,
     params: { description?: string; stage?: DesignerStage; attachment_urls?: string[] }
   ) {
-    const submission = await this.submissionRepo.findOneBy({ id: submissionId });
+    const submission = await this.submissionRepo.findOne({
+      where: { id: submissionId },
+      relations: ["designer_task"],
+    });
     if (!submission) throw new AppError(404, "Designer submission not found");
 
     if (params.description !== undefined) submission.description = params.description;
@@ -501,7 +505,14 @@ export class DesignerService {
       submission.attachment_urls = syncAttachments(submission.attachment_urls, params.attachment_urls) as any;
     }
 
-    return this.submissionRepo.save(submission);
+    const saved = await this.submissionRepo.save(submission);
+
+    if (submission.designer_task) {
+      submission.designer_task.status = ReviewOutcome.PENDING;
+      await this.taskRepo.save(submission.designer_task);
+    }
+
+    return saved;
   }
 
   async createSubmissionReview(

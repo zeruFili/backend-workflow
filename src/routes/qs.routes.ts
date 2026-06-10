@@ -48,6 +48,13 @@ router.post(
   submissionUploadMiddleware,
   (req, res, next) => quantitySurveyorController.createSubmission(req, res, next)
 );
+router.patch(
+  "/qs-tasks/submit/:id",
+  authenticate,
+  authorize(UserRole.QUANTITY_SURVEYOR),
+  submissionUploadMiddleware,
+  (req, res, next) => quantitySurveyorController.updateSubmission(req, res, next)
+);
 router.post(
   "/qs-tasks/evaluate/:id",
   authenticate,
