@@ -11,6 +11,7 @@ import { UserRole } from "../enums/user-role.enum";
 import { ResourceType } from "../enums/resource-type.enum";
 import { ParentType } from "../enums/parent-type.enum";
 import { AppError } from "../middlewares/error.middleware";
+import { pickSafeUserFields } from "../utils/response.utils";
 
 interface PaginatedParams {
   page: number;
@@ -45,6 +46,15 @@ export class DataCollectorService {
   private reviewRepo = AppDataSource.getRepository(DataCollectorReview);
   private userRepo = AppDataSource.getRepository(User);
   private notificationRepo = AppDataSource.getRepository(Notification);
+
+  private sanitizeTask(task: any) {
+    return {
+      ...task,
+      assigned_to_user: pickSafeUserFields(task.assigned_to_user),
+      assigned_by_user: pickSafeUserFields(task.assigned_by_user),
+      updated_by_user: pickSafeUserFields(task.updated_by_user),
+    };
+  }
 
   private async createNotification(data: {
     user_id: string;
@@ -96,7 +106,7 @@ export class DataCollectorService {
 
     return {
       success: true,
-      data,
+      data: data.map((task) => this.sanitizeTask(task)),
       meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
     };
   }
@@ -113,7 +123,7 @@ export class DataCollectorService {
       order: { created_at: "DESC" },
     });
 
-    return { ...task, submissions };
+    return this.sanitizeTask({ ...task, submissions });
   }
 
   async createTask(params: CreateTaskParams, assignedByUserId: string) {
@@ -269,11 +279,16 @@ export class DataCollectorService {
     const submission = await this.submissionRepo.findOneBy({ id: submissionId });
     if (!submission) throw new AppError(404, "Data collector submission not found");
 
-    return this.reviewRepo.find({
+    const reviews = await this.reviewRepo.find({
       where: { data_collector_submission_id: submissionId },
       relations: ["reviewer_user"],
       order: { created_at: "DESC" },
     });
+
+    return reviews.map((r) => ({
+      ...r,
+      reviewer_user: pickSafeUserFields(r.reviewer_user),
+    }));
   }
 }
 

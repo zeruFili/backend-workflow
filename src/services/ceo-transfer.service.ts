@@ -3,6 +3,7 @@ import { CeoTransfer } from "../entities/CeoTransfer";
 import { User } from "../entities/User";
 import { Notification } from "../entities/Notification";
 import { AppError } from "../middlewares/error.middleware";
+import { pickSafeUserFields } from "../utils/response.utils";
 
 interface CreateTransferParams {
   finance_user_id: string;
@@ -57,8 +58,14 @@ export class CeoTransferService {
       take: l,
     });
 
+    const sanitized = data.map((t) => ({
+      ...t,
+      finance_user: pickSafeUserFields(t.finance_user),
+      ceo_user: pickSafeUserFields(t.ceo_user),
+    }));
+
     return {
-      data,
+      data: sanitized,
       meta: {
         total,
         page: p,
@@ -74,7 +81,11 @@ export class CeoTransferService {
       relations: ["finance_user", "ceo_user"],
     });
     if (!transfer) throw new AppError(404, "CEO transfer not found");
-    return transfer;
+    return {
+      ...transfer,
+      finance_user: pickSafeUserFields(transfer.finance_user),
+      ceo_user: pickSafeUserFields(transfer.ceo_user),
+    };
   }
 
   async create(params: CreateTransferParams, userId: string) {

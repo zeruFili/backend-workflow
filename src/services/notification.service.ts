@@ -3,6 +3,7 @@ import { Notification } from "../entities/Notification";
 import { ResourceType } from "../enums/resource-type.enum";
 import { ParentType } from "../enums/parent-type.enum";
 import { AppError } from "../middlewares/error.middleware";
+import { pickSafeUserFields } from "../utils/response.utils";
 
 export class NotificationService {
   private repo = AppDataSource.getRepository(Notification);
@@ -40,8 +41,13 @@ export class NotificationService {
       take: limit,
     });
 
+    const sanitized = data.map((n) => ({
+      ...n,
+      from_user: pickSafeUserFields(n.from_user as any),
+    }));
+
     return {
-      data,
+      data: sanitized,
       meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
     };
   }

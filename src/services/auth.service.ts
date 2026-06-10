@@ -3,6 +3,7 @@ import jwt from "jsonwebtoken";
 import { AppDataSource } from "../config/data-source";
 import { User } from "../entities/User";
 import { AppError } from "../middlewares/error.middleware";
+import { pickSafeUserFields, SafeUserOutput } from "../utils/response.utils";
 
 const userRepo = () => AppDataSource.getRepository(User);
 
@@ -15,30 +16,25 @@ const BCRYPT_COST = Number.isFinite(parsedBcryptCost) && parsedBcryptCost > 0 ? 
 function generateAccessToken(user: {
   id: string;
   role: string;
-  email: string;
-  full_name: string;
 }): string {
   return jwt.sign(
     {
       sub: user.id,
       role: user.role,
-      email: user.email,
-      full_name: user.full_name,
     },
     JWT_SECRET,
     { expiresIn: ACCESS_TOKEN_TTL }
   );
 }
 
-function sanitizeUser(user: User) {
-  const { password_hash, ...rest } = user;
-  return rest;
+function sanitizeUser(user: User): SafeUserOutput {
+  return pickSafeUserFields(user)!;
 }
 
 export class AuthService {
   async login(email: string, password: string): Promise<{
     accessToken: string;
-    user: Record<string, unknown>;
+    user: SafeUserOutput;
   }> {
     const user = await userRepo().findOne({ where: { email } });
     if (!user) {
@@ -60,8 +56,6 @@ export class AuthService {
     const accessToken = generateAccessToken({
       id: user.id,
       role: user.role,
-      email: user.email,
-      full_name: user.full_name,
     });
 
     return {
@@ -93,7 +87,7 @@ export class AuthService {
     await userRepo().save(user);
   }
 
-  async getMe(userId: string): Promise<Record<string, unknown>> {
+  async getMe(userId: string): Promise<SafeUserOutput> {
     const user = await userRepo().findOne({ where: { id: userId } });
     if (!user) {
       throw new AppError(404, "User not found");

@@ -4,6 +4,7 @@ import { AppDataSource } from "../config/data-source";
 import { User } from "../entities/User";
 import { UserRole } from "../enums/user-role.enum";
 import { AppError } from "../middlewares/error.middleware";
+import { pickSafeUserFields, SafeUserOutput } from "../utils/response.utils";
 
 interface PaginatedResult<T> {
   data: T[];
@@ -47,9 +48,8 @@ const userRepo = () => AppDataSource.getRepository(User);
 const parsedBcryptCost = Number(process.env.BCRYPT_COST);
 const BCRYPT_COST = Number.isFinite(parsedBcryptCost) && parsedBcryptCost > 0 ? parsedBcryptCost : 12;
 
-function sanitizeUser(user: User): Partial<User> {
-  const { password_hash, ...rest } = user;
-  return rest;
+function sanitizeUser(user: User): SafeUserOutput {
+  return pickSafeUserFields(user)!;
 }
 
 export class UserService {
@@ -59,7 +59,7 @@ export class UserService {
     role?: UserRole,
     is_active?: boolean,
     search?: string
-  ): Promise<PaginatedResult<Partial<User>>> {
+  ): Promise<PaginatedResult<SafeUserOutput>> {
     const p = Math.max(1, page);
     const l = Math.min(100, Math.max(1, limit));
     const where: FindOptionsWhere<User> = {};
@@ -100,7 +100,7 @@ export class UserService {
     };
   }
 
-  async findById(id: string): Promise<Partial<User>> {
+  async findById(id: string): Promise<SafeUserOutput> {
     const user = await userRepo().findOne({ where: { id } });
     if (!user) {
       throw new AppError(404, "User not found");
@@ -108,7 +108,7 @@ export class UserService {
     return sanitizeUser(user);
   }
 
-  async create(dto: CreateUserInput): Promise<Partial<User>> {
+  async create(dto: CreateUserInput): Promise<SafeUserOutput> {
     if (dto.role === UserRole.CEO) {
       throw new AppError(400, "Cannot create a user with CEO role");
     }
@@ -138,7 +138,7 @@ export class UserService {
     id: string,
     dto: UpdateUserInput,
     currentUser: CurrentUser
-  ): Promise<Partial<User>> {
+  ): Promise<SafeUserOutput> {
     const user = await userRepo().findOne({ where: { id } });
     if (!user) {
       throw new AppError(404, "User not found");
@@ -207,7 +207,7 @@ export class UserService {
     id: string,
     dto: UpdateUserStatusInput,
     currentUser: CurrentUser
-  ): Promise<Partial<User>> {
+  ): Promise<SafeUserOutput> {
     const user = await userRepo().findOne({ where: { id } });
     if (!user) {
       throw new AppError(404, "User not found");

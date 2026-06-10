@@ -7,7 +7,7 @@ export function auditLog(action: string, entityType: string) {
 
     res.json = function (body: any) {
       if (res.statusCode >= 200 && res.statusCode < 400 && req.user) {
-        console.log(`[AUDIT] ${entityType} ${action} by ${req.user.full_name} (${req.user.id})`);
+        console.log(`[AUDIT] ${entityType} ${action} by user ${req.user.id}`);
       }
       return originalJson(body);
     };

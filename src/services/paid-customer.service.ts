@@ -9,6 +9,7 @@ import { ReviewOutcome } from "../enums/review-outcome.enum";
 import { UserRole } from "../enums/user-role.enum";
 import { AppError } from "../middlewares/error.middleware";
 import { In } from "typeorm";
+import { pickSafeUserFields } from "../utils/response.utils";
 
 interface PaginatedParams {
   page: number;
@@ -274,7 +275,10 @@ export class PaidCustomerService {
       order: { created_at: "ASC" },
     });
 
-    return reviews;
+    return reviews.map((r) => ({
+      ...r,
+      reviewer: pickSafeUserFields(r.reviewer as any),
+    }));
   }
 
   async update(id: string, params: UpdateParams) {

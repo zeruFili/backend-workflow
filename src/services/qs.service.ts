@@ -11,6 +11,7 @@ import { UserRole } from "../enums/user-role.enum";
 import { ResourceType } from "../enums/resource-type.enum";
 import { ParentType } from "../enums/parent-type.enum";
 import { AppError } from "../middlewares/error.middleware";
+import { pickSafeUserFields } from "../utils/response.utils";
 
 interface PaginatedParams {
   page: number;
@@ -43,6 +44,14 @@ export class QuantitySurveyorService {
   private reviewRepo = AppDataSource.getRepository(QuantitySurveyorReview);
   private userRepo = AppDataSource.getRepository(User);
   private notificationRepo = AppDataSource.getRepository(Notification);
+
+  private sanitizeTask(task: any) {
+    return {
+      ...task,
+      assigned_to_user: pickSafeUserFields(task.assigned_to_user),
+      assigned_by_user: pickSafeUserFields(task.assigned_by_user),
+    };
+  }
 
   private async createNotification(params: {
     user_id: string;
@@ -93,7 +102,7 @@ export class QuantitySurveyorService {
 
     return {
       success: true,
-      data,
+      data: data.map((task) => this.sanitizeTask(task)),
       meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
     };
   }
@@ -110,7 +119,7 @@ export class QuantitySurveyorService {
       order: { created_at: "DESC" },
     });
 
-    return { ...task, submissions };
+    return this.sanitizeTask({ ...task, submissions });
   }
 
   async createTask(params: CreateTaskParams, assignedByUserId: string) {
@@ -250,11 +259,16 @@ export class QuantitySurveyorService {
     const submission = await this.submissionRepo.findOneBy({ id: submissionId });
     if (!submission) throw new AppError(404, "Quantity surveyor submission not found");
 
-    return this.reviewRepo.find({
+    const reviews = await this.reviewRepo.find({
       where: { quantity_surveyor_submission_id: submissionId },
       relations: ["reviewer_user"],
       order: { created_at: "DESC" },
     });
+
+    return reviews.map((r) => ({
+      ...r,
+      reviewer_user: pickSafeUserFields(r.reviewer_user),
+    }));
   }
 
   async evaluate(

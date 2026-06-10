@@ -9,6 +9,7 @@ const MAX_FILE_SIZE = parseInt(process.env.MAX_FILE_SIZE || "10485760", 10);
 const ALLOWED_IMAGE_TYPES = new Set([
   "image/jpeg",
   "image/png",
+  "image/jpg",
   "image/gif",
   "image/webp",
   "image/svg+xml",

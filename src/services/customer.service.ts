@@ -2,6 +2,7 @@ import { AppDataSource } from "../config/data-source";
 import { Customer } from "../entities/Customer";
 import { UserRole } from "../enums/user-role.enum";
 import { AppError } from "../middlewares/error.middleware";
+import { pickSafeUserFields } from "../utils/response.utils";
 
 const E164_REGEX = /^\+[1-9]\d{1,14}$/;
 
@@ -70,8 +71,13 @@ export class CustomerService {
     const skip = (page - 1) * limit;
     const [data, total] = await qb.skip(skip).take(limit).getManyAndCount();
 
+    const sanitized = data.map((c) => ({
+      ...c,
+      marketing_user: pickSafeUserFields(c.marketing_user),
+    }));
+
     return {
-      data,
+      data: sanitized,
       total,
       page,
       limit,
@@ -87,7 +93,10 @@ export class CustomerService {
     if (!customer) {
       throw new AppError(404, "Customer not found");
     }
-    return customer;
+    return {
+      ...customer,
+      marketing_user: pickSafeUserFields(customer.marketing_user),
+    };
   }
 
   async create(params: CreateParams, userId: string) {
