@@ -97,11 +97,12 @@ export class PaidCustomerController {
 
       const filePaths = getFilePathsFromRequest(req, "paid_customer_attachments");
       const bodyAttachmentUrls = req.body.attachment_urls as string[] | undefined;
-      const mergedUrls = [...filePaths, ...(bodyAttachmentUrls || [])];
+      const hasAttachments = filePaths.length > 0 || bodyAttachmentUrls !== undefined;
+      const mergedUrls = hasAttachments ? [...filePaths, ...(bodyAttachmentUrls || [])] : undefined;
 
       const result = await paidCustomerService.update(id, {
         ...dto,
-        attachment_urls: mergedUrls.length > 0 ? mergedUrls : undefined,
+        attachment_urls: mergedUrls,
       });
 
       res.status(200).json({ success: true, data: result, message: "Paid customer updated" });

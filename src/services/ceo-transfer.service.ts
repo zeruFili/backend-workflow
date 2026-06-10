@@ -4,6 +4,7 @@ import { User } from "../entities/User";
 import { Notification } from "../entities/Notification";
 import { AppError } from "../middlewares/error.middleware";
 import { pickSafeUserFields } from "../utils/response.utils";
+import { syncAttachments } from "../utils/upload.utils";
 
 interface CreateTransferParams {
   finance_user_id: string;
@@ -125,7 +126,9 @@ export class CeoTransferService {
     if (params.ceo_user_id !== undefined) transfer.ceo_user_id = params.ceo_user_id;
     if (params.description !== undefined) transfer.description = params.description;
     if (params.amount !== undefined) transfer.amount = params.amount;
-    if (params.attachment_urls !== undefined) transfer.attachment_urls = params.attachment_urls as any;
+    if (params.attachment_urls !== undefined) {
+      transfer.attachment_urls = syncAttachments(transfer.attachment_urls, params.attachment_urls) as any;
+    }
 
     return this.repo.save(transfer);
   }

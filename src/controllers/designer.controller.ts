@@ -12,6 +12,7 @@ import {
   AssignDesignerDto,
   CreateDesignerSubmissionDto,
   CreateSubmissionReviewDto,
+  UpdateSubmissionReviewDto,
   CreateTaskReviewDto,
   DesignApplicationDto,
   PauseTaskDto,
@@ -133,11 +134,12 @@ export class DesignerController {
 
       const filePaths = getFilePathsFromRequest(req, "designer_tasks");
       const bodyAttachmentUrls = req.body.attachment_urls as string[] | undefined;
-      const mergedUrls = [...filePaths, ...(bodyAttachmentUrls || [])];
+      const hasAttachments = filePaths.length > 0 || bodyAttachmentUrls !== undefined;
+      const mergedUrls = hasAttachments ? [...filePaths, ...(bodyAttachmentUrls || [])] : undefined;
 
       const task = await designerService.updateTask(
         id,
-        { ...dto, attachment_urls: mergedUrls.length > 0 ? mergedUrls : undefined },
+        { ...dto, attachment_urls: mergedUrls },
         req.user
       );
       res.status(200).json({ success: true, data: task, message: "Designer task updated successfully" });
@@ -244,12 +246,13 @@ export class DesignerController {
 
       const filePaths = getFilePathsFromRequest(req, "designer_submissions");
       const bodyAttachmentUrls = req.body.attachment_urls as string[] | undefined;
-      const mergedUrls = [...filePaths, ...(bodyAttachmentUrls || [])];
+      const hasAttachments = filePaths.length > 0 || bodyAttachmentUrls !== undefined;
+      const mergedUrls = hasAttachments ? [...filePaths, ...(bodyAttachmentUrls || [])] : undefined;
 
       const submission = await designerService.updateSubmission(submissionId, {
         description,
         stage,
-        attachment_urls: mergedUrls.length > 0 ? mergedUrls : undefined,
+        attachment_urls: mergedUrls,
       });
 
       res.status(200).json({ success: true, data: submission, message: "Submission updated successfully" });
@@ -274,6 +277,26 @@ export class DesignerController {
         dto.description
       );
       res.status(201).json({ success: true, data: review, message: "Submission reviewed successfully" });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async updateSubmissionReview(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      if (!req.user) {
+        res.status(401).json({ success: false, message: "Unauthorized" });
+        return;
+      }
+
+      const reviewId = req.params.id as string;
+      const dto = await validateDto(UpdateSubmissionReviewDto, req.body, req);
+      const review = await designerService.updateSubmissionReview(
+        reviewId,
+        req.user.id,
+        { review_outcome: dto.review_outcome, description: dto.description }
+      );
+      res.status(200).json({ success: true, data: review, message: "Review updated successfully" });
     } catch (error) {
       next(error);
     }

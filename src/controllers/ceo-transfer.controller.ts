@@ -84,11 +84,12 @@ export class CeoTransferController {
 
       const filePaths = getFilePathsFromRequest(req, "ceo_transfers");
       const bodyAttachmentUrls = req.body.attachment_urls as string[] | undefined;
-      const mergedUrls = [...filePaths, ...(bodyAttachmentUrls || [])];
+      const hasAttachments = filePaths.length > 0 || bodyAttachmentUrls !== undefined;
+      const mergedUrls = hasAttachments ? [...filePaths, ...(bodyAttachmentUrls || [])] : undefined;
 
       const result = await ceoTransferService.update(id, {
         ...dto,
-        attachment_urls: mergedUrls.length > 0 ? mergedUrls : undefined,
+        attachment_urls: mergedUrls,
       });
 
       res.status(200).json({ success: true, data: result, message: "CEO transfer updated" });

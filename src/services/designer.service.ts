@@ -16,6 +16,7 @@ import { ResourceType } from "../enums/resource-type.enum";
 import { ParentType } from "../enums/parent-type.enum";
 import { AppError } from "../middlewares/error.middleware";
 import { pickSafeUserFields } from "../utils/response.utils";
+import { syncAttachments } from "../utils/upload.utils";
 
 interface PaginatedParams {
   page: number;
@@ -283,7 +284,9 @@ export class DesignerService {
     if (params.story_point !== undefined) task.story_point = params.story_point;
     if (params.due_date !== undefined) task.due_date = params.due_date as any;
     if (params.assigned_to_user_id !== undefined) task.assigned_to_user_id = params.assigned_to_user_id as any;
-    if (params.attachment_urls !== undefined) task.attachment_urls = params.attachment_urls as any;
+    if (params.attachment_urls !== undefined) {
+      task.attachment_urls = syncAttachments(task.attachment_urls, params.attachment_urls) as any;
+    }
 
     if (currentUser.role === UserRole.CEO) {
       task.updated_by = currentUser.id as any;
@@ -429,6 +432,10 @@ export class DesignerService {
       throw new AppError(409, "Cannot submit to a paused task");
     }
 
+    if (task.status === ReviewOutcome.REJECTED) {
+      throw new AppError(400, "Cannot submit to a rejected task");
+    }
+
     const resolvedStage = stage ?? task.stage ?? DesignerStage.CASE_STUDY;
     const stageIdx = STAGE_ORDER.indexOf(resolvedStage);
     if (stageIdx === -1) {
@@ -490,7 +497,9 @@ export class DesignerService {
 
     if (params.description !== undefined) submission.description = params.description;
     if (params.stage !== undefined) submission.stage = params.stage;
-    if (params.attachment_urls !== undefined) submission.attachment_urls = params.attachment_urls as any;
+    if (params.attachment_urls !== undefined) {
+      submission.attachment_urls = syncAttachments(submission.attachment_urls, params.attachment_urls) as any;
+    }
 
     return this.submissionRepo.save(submission);
   }
@@ -507,6 +516,22 @@ export class DesignerService {
     });
     if (!submission) throw new AppError(404, "Designer submission not found");
 
+    const task = submission.designer_task;
+    if (!task) throw new AppError(404, "Associated designer task not found for this submission");
+
+    if (
+      task.stage === DesignerStage.FINAL_STAGE &&
+      task.status === ReviewOutcome.APPROVED
+    ) {
+      throw new AppError(
+        400,
+        "Reviews cannot be submitted for a final task that has already been approved."
+      );
+    }
+
+    task.status = reviewOutcome;
+    await this.taskRepo.save(task);
+
     const review = new DesignerSubmissionReview();
     review.designer_submission_id = submissionId;
     review.reviewer_user_id = reviewerUserId;
@@ -515,8 +540,7 @@ export class DesignerService {
 
     const saved = await this.submissionReviewRepo.save(review);
 
-    const task = submission.designer_task;
-    if (task?.assigned_to_user_id) {
+    if (task.assigned_to_user_id) {
       await this.createNotification({
         user_id: task.assigned_to_user_id,
         from_user_id: reviewerUserId,
@@ -525,6 +549,95 @@ export class DesignerService {
         parent_id: task.id,
         parent_type: ParentType.DESIGNER_TASK,
         type: `Your submission was ${reviewOutcome}`,
+      });
+    }
+
+    return saved;
+  }
+
+  async updateSubmissionReview(
+    reviewId: string,
+    reviewerUserId: string,
+    params: { review_outcome?: ReviewOutcome; description?: string }
+  ) {
+    const review = await this.submissionReviewRepo.findOne({
+      where: { id: reviewId },
+      relations: ["designer_submission", "designer_submission.designer_task"],
+    });
+    if (!review) throw new AppError(404, "Designer submission review not found");
+
+    if (review.reviewer_user_id !== reviewerUserId) {
+      throw new AppError(403, "Only the original reviewer can update this review");
+    }
+
+    const hoursSinceCreation = (Date.now() - review.created_at.getTime()) / (1000 * 60 * 60);
+    if (hoursSinceCreation > 24) {
+      throw new AppError(400, "Reviews can only be updated within 24 hours of creation");
+    }
+
+    const submission = review.designer_submission;
+    if (!submission) throw new AppError(404, "Associated submission not found");
+
+    const taskId = submission.designer_task_id;
+
+    const latestSubmission = await this.submissionRepo.findOne({
+      where: { designer_task_id: taskId },
+      order: { created_at: "DESC" },
+    });
+
+    if (latestSubmission && latestSubmission.id !== submission.id) {
+      throw new AppError(400, "Cannot update review: a newer submission exists for this task");
+    }
+
+    const task = submission.designer_task;
+    if (!task) throw new AppError(404, "Associated designer task not found");
+
+    const newOutcome = params.review_outcome ?? review.review_outcome;
+
+    if (params.review_outcome !== undefined) {
+      review.review_outcome = params.review_outcome;
+      task.status = params.review_outcome;
+      await this.taskRepo.save(task);
+    }
+
+    if (params.description !== undefined) {
+      review.description = params.description;
+    }
+
+    const saved = await this.submissionReviewRepo.save(review);
+
+    await this.notificationRepo.update(
+      { parent_id: taskId, viewed: false },
+      { viewed: true }
+    );
+
+    const recipientIds = new Set<string>();
+
+    if (task.assigned_to_user_id) {
+      recipientIds.add(task.assigned_to_user_id);
+    }
+
+    const ceoGm = await this.userRepo.find({
+      where: [
+        { role: UserRole.CEO, is_active: true },
+        { role: UserRole.GENERAL_MANAGER, is_active: true },
+      ],
+    });
+
+    for (const user of ceoGm) {
+      recipientIds.add(user.id);
+    }
+
+    for (const recipientId of recipientIds) {
+      if (recipientId === reviewerUserId) continue;
+      await this.createNotification({
+        user_id: recipientId,
+        from_user_id: reviewerUserId,
+        resource_id: saved.id,
+        resource_type: ResourceType.REVIEW,
+        parent_id: taskId,
+        parent_type: ParentType.DESIGNER_TASK,
+        type: `Submission review updated to ${newOutcome}`,
       });
     }
 

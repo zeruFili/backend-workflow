@@ -137,6 +137,17 @@ export class DesignApplicationDto {
   cover_note?: string;
 }
 
+export class UpdateSubmissionReviewDto {
+  @IsOptional()
+  @IsEnum(ReviewOutcome)
+  review_outcome?: ReviewOutcome;
+
+  @IsOptional()
+  @IsString()
+  @Length(1, 5000)
+  description?: string;
+}
+
 export class PauseTaskDto {
   @IsString()
   @Length(1, 5000)

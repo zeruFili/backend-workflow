@@ -10,6 +10,7 @@ import { UserRole } from "../enums/user-role.enum";
 import { AppError } from "../middlewares/error.middleware";
 import { In } from "typeorm";
 import { pickSafeUserFields } from "../utils/response.utils";
+import { syncAttachments } from "../utils/upload.utils";
 
 interface PaginatedParams {
   page: number;
@@ -289,7 +290,9 @@ export class PaidCustomerService {
 
     if (params.description !== undefined) paidCustomer.description = params.description;
     if (params.status !== undefined) paidCustomer.status = params.status;
-    if (params.attachment_urls !== undefined) paidCustomer.attachment_urls = params.attachment_urls as any;
+    if (params.attachment_urls !== undefined) {
+      paidCustomer.attachment_urls = syncAttachments(paidCustomer.attachment_urls, params.attachment_urls) as any;
+    }
 
     return this.repo.save(paidCustomer);
   }

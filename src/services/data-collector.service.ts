@@ -12,6 +12,7 @@ import { ResourceType } from "../enums/resource-type.enum";
 import { ParentType } from "../enums/parent-type.enum";
 import { AppError } from "../middlewares/error.middleware";
 import { pickSafeUserFields } from "../utils/response.utils";
+import { syncAttachments } from "../utils/upload.utils";
 
 interface PaginatedParams {
   page: number;
@@ -164,7 +165,9 @@ export class DataCollectorService {
     if (params.task_state !== undefined) task.task_state = params.task_state;
     if (params.due_date !== undefined) task.due_date = params.due_date as any;
     if (params.assigned_to_user_id !== undefined) task.assigned_to_user_id = params.assigned_to_user_id as any;
-    if (params.attachment_urls !== undefined) task.attachment_urls = params.attachment_urls as any;
+    if (params.attachment_urls !== undefined) {
+      task.attachment_urls = syncAttachments(task.attachment_urls, params.attachment_urls) as any;
+    }
     task.updated_by = userId as any;
 
     return this.taskRepo.save(task);
@@ -215,7 +218,9 @@ export class DataCollectorService {
     if (!submission) throw new AppError(404, "Data collector submission not found");
 
     if (params.description !== undefined) submission.description = params.description;
-    if (params.attachment_urls !== undefined) submission.attachment_urls = params.attachment_urls as any;
+    if (params.attachment_urls !== undefined) {
+      submission.attachment_urls = syncAttachments(submission.attachment_urls, params.attachment_urls) as any;
+    }
 
     return this.submissionRepo.save(submission);
   }

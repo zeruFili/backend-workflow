@@ -12,6 +12,7 @@ import { ResourceType } from "../enums/resource-type.enum";
 import { ParentType } from "../enums/parent-type.enum";
 import { AppError } from "../middlewares/error.middleware";
 import { pickSafeUserFields } from "../utils/response.utils";
+import { syncAttachments } from "../utils/upload.utils";
 
 interface PaginatedParams {
   page: number;
@@ -156,7 +157,9 @@ export class QuantitySurveyorService {
     if (params.description !== undefined) task.description = params.description;
     if (params.status !== undefined) task.status = params.status;
     if (params.due_date !== undefined) task.due_date = params.due_date;
-    if (params.attachment_urls !== undefined) task.attachment_urls = params.attachment_urls as any;
+    if (params.attachment_urls !== undefined) {
+      task.attachment_urls = syncAttachments(task.attachment_urls, params.attachment_urls) as any;
+    }
 
     return this.taskRepo.save(task);
   }

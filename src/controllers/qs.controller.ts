@@ -99,11 +99,12 @@ export class QuantitySurveyorController {
 
       const filePaths = getFilePathsFromRequest(req, "qs_tasks");
       const bodyAttachmentUrls = req.body.attachment_urls as string[] | undefined;
-      const mergedUrls = [...filePaths, ...(bodyAttachmentUrls || [])];
+      const hasAttachments = filePaths.length > 0 || bodyAttachmentUrls !== undefined;
+      const mergedUrls = hasAttachments ? [...filePaths, ...(bodyAttachmentUrls || [])] : undefined;
 
       const task = await quantitySurveyorService.updateTask(
         id,
-        { ...dto, attachment_urls: mergedUrls.length > 0 ? mergedUrls : undefined }
+        { ...dto, attachment_urls: mergedUrls }
       );
       res.status(200).json({ success: true, data: task, message: "QS task updated successfully" });
     } catch (error) {
@@ -212,12 +213,13 @@ export class QuantitySurveyorController {
 
       const filePaths = getFilePathsFromRequest(req, "qs_evaluations");
       const bodyAttachmentUrls = req.body.attachment_urls as string[] | undefined;
-      const mergedUrls = [...filePaths, ...(bodyAttachmentUrls || [])];
+      const hasAttachments = filePaths.length > 0 || bodyAttachmentUrls !== undefined;
+      const mergedUrls = hasAttachments ? [...filePaths, ...(bodyAttachmentUrls || [])] : undefined;
 
       const evaluation = await quantitySurveyorService.updateEvaluate(id, {
         description,
         review_outcome,
-        attachment_urls: mergedUrls.length > 0 ? mergedUrls : undefined,
+        attachment_urls: mergedUrls,
       }, req.user.id);
 
       res.status(200).json({ success: true, data: evaluation, message: "Evaluation updated" });

@@ -240,6 +240,30 @@ export function deleteFiles(relativePaths: string[]): void {
   }
 }
 
+export function syncAttachments(
+  oldUrls: string[] | null | undefined,
+  newUrls: string[] | null | undefined
+): string[] | null | undefined {
+  if (newUrls === undefined) {
+    return undefined;
+  }
+
+  const oldSet = new Set(oldUrls ?? []);
+  const newSet = new Set(newUrls ?? []);
+
+  for (const oldUrl of oldSet) {
+    if (!newSet.has(oldUrl)) {
+      deleteFile(oldUrl);
+    }
+  }
+
+  if (newUrls === null || (Array.isArray(newUrls) && newUrls.length === 0)) {
+    return null;
+  }
+
+  return newUrls;
+}
+
 export function getFullUrl(
   filePath: string,
   req?: { protocol: string; get: (h: string) => string | undefined }

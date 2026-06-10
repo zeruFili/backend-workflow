@@ -104,11 +104,12 @@ export class DataCollectorController {
 
       const filePaths = getFilePathsFromRequest(req, "dc_tasks");
       const bodyAttachmentUrls = req.body.attachment_urls as string[] | undefined;
-      const mergedUrls = [...filePaths, ...(bodyAttachmentUrls || [])];
+      const hasAttachments = filePaths.length > 0 || bodyAttachmentUrls !== undefined;
+      const mergedUrls = hasAttachments ? [...filePaths, ...(bodyAttachmentUrls || [])] : undefined;
 
       const task = await dataCollectorService.updateTask(
         id,
-        { ...dto, attachment_urls: mergedUrls.length > 0 ? mergedUrls : undefined },
+        { ...dto, attachment_urls: mergedUrls },
         req.user.id
       );
       res.status(200).json({ success: true, data: task, message: "Data collector task updated successfully" });
@@ -156,11 +157,12 @@ export class DataCollectorController {
 
       const filePaths = getFilePathsFromRequest(req, "dc_submissions");
       const bodyAttachmentUrls = req.body.attachment_urls as string[] | undefined;
-      const mergedUrls = [...filePaths, ...(bodyAttachmentUrls || [])];
+      const hasAttachments = filePaths.length > 0 || bodyAttachmentUrls !== undefined;
+      const mergedUrls = hasAttachments ? [...filePaths, ...(bodyAttachmentUrls || [])] : undefined;
 
       const submission = await dataCollectorService.updateSubmission(submissionId, {
         description,
-        attachment_urls: mergedUrls.length > 0 ? mergedUrls : undefined,
+        attachment_urls: mergedUrls,
       });
 
       res.status(200).json({ success: true, data: submission, message: "Submission updated successfully" });
