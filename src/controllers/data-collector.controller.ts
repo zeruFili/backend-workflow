@@ -4,7 +4,7 @@ import { plainToInstance } from "class-transformer";
 import { AuthRequest } from "../middlewares/auth.middleware";
 import { AppError } from "../middlewares/error.middleware";
 import { dataCollectorService } from "../services/data-collector.service";
-import { processUploadedFiles } from "../utils/upload.utils";
+import { getFilePathsFromRequest, cleanupUploadedFiles } from "../utils/upload.utils";
 import {
   CreateDCTaskDto,
   UpdateDCTaskDto,
@@ -12,7 +12,7 @@ import {
   CreateDCReviewDto,
 } from "../validators/data-collector.dto";
 
-async function validateDto<T extends object>(dtoClass: new () => T, plain: object): Promise<T> {
+async function validateDto<T extends object>(dtoClass: new () => T, plain: object, req: AuthRequest): Promise<T> {
   const instance = plainToInstance(dtoClass, plain);
   const errors = await validate(instance, {
     whitelist: true,
@@ -20,6 +20,7 @@ async function validateDto<T extends object>(dtoClass: new () => T, plain: objec
   });
 
   if (errors.length > 0) {
+    cleanupUploadedFiles(req);
     const messages = errors
       .map((e) => Object.values(e.constraints || {}))
       .flat()
@@ -76,13 +77,9 @@ export class DataCollectorController {
         return;
       }
 
-      const dto = await validateDto(CreateDCTaskDto, req.body);
+      const dto = await validateDto(CreateDCTaskDto, req.body, req);
 
-      const filePaths = await processUploadedFiles(req, res, {
-        fieldName: "attachmentFiles",
-        maxCount: 10,
-        subfolder: "dc_tasks",
-      });
+      const filePaths = getFilePathsFromRequest(req, "dc_tasks");
       const mergedUrls = [...filePaths, ...(dto.attachment_urls || [])];
 
       const task = await dataCollectorService.createTask(
@@ -103,13 +100,9 @@ export class DataCollectorController {
       }
 
       const id = req.params.id as string;
-      const dto = await validateDto(UpdateDCTaskDto, req.body);
+      const dto = await validateDto(UpdateDCTaskDto, req.body, req);
 
-      const filePaths = await processUploadedFiles(req, res, {
-        fieldName: "attachmentFiles",
-        maxCount: 10,
-        subfolder: "dc_tasks",
-      });
+      const filePaths = getFilePathsFromRequest(req, "dc_tasks");
       const bodyAttachmentUrls = req.body.attachment_urls as string[] | undefined;
       const mergedUrls = [...filePaths, ...(bodyAttachmentUrls || [])];
 
@@ -132,13 +125,10 @@ export class DataCollectorController {
       }
 
       const taskId = req.params.id as string;
-      const dto = await validateDto(CreateDCSubmissionDto, req.body);
+      const dto = await validateDto(CreateDCSubmissionDto, req.body, req);
 
-      const filePaths = await processUploadedFiles(req, res, {
-        fieldName: "attachmentFiles",
-        maxCount: 10,
-        subfolder: "dc_submissions",
-      });
+      const filePaths = getFilePathsFromRequest(req, "dc_submissions");
+
       const bodyAttachmentUrls = req.body.attachment_urls as string[] | undefined;
       const mergedUrls = [...filePaths, ...(bodyAttachmentUrls || [])];
 
@@ -164,11 +154,7 @@ export class DataCollectorController {
       const submissionId = req.params.id as string;
       const { description } = req.body;
 
-      const filePaths = await processUploadedFiles(req, res, {
-        fieldName: "attachmentFiles",
-        maxCount: 10,
-        subfolder: "dc_submissions",
-      });
+      const filePaths = getFilePathsFromRequest(req, "dc_submissions");
       const bodyAttachmentUrls = req.body.attachment_urls as string[] | undefined;
       const mergedUrls = [...filePaths, ...(bodyAttachmentUrls || [])];
 
@@ -201,7 +187,7 @@ export class DataCollectorController {
       }
 
       const submissionId = req.params.id as string;
-      const dto = await validateDto(CreateDCReviewDto, req.body);
+      const dto = await validateDto(CreateDCReviewDto, req.body, req);
       const review = await dataCollectorService.createReview(
         submissionId,
         req.user.id,

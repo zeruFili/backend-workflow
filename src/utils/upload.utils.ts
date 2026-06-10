@@ -225,6 +225,14 @@ export function processUploadedFiles(
   });
 }
 
+export function cleanupUploadedFiles(req: Request): void {
+  const files = req.files as Express.Multer.File[] | undefined;
+  if (!files || files.length === 0) return;
+  for (const file of files) {
+    try { fs.unlinkSync(file.path); } catch {}
+  }
+}
+
 export function deleteFiles(relativePaths: string[]): void {
   for (const p of relativePaths) {
     deleteFile(p);

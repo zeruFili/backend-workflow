@@ -5,9 +5,9 @@ import { AuthRequest } from "../middlewares/auth.middleware";
 import { AppError } from "../middlewares/error.middleware";
 import { paidCustomerService } from "../services/paid-customer.service";
 import { CreatePaidCustomerDto, VerifyPaidCustomerDto, UpdatePaidCustomerDto } from "../validators/paid-customer.dto";
-import { processUploadedFiles } from "../utils/upload.utils";
+import { getFilePathsFromRequest, cleanupUploadedFiles } from "../utils/upload.utils";
 
-async function validateDto<T extends object>(dtoClass: new () => T, plain: object): Promise<T> {
+async function validateDto<T extends object>(dtoClass: new () => T, plain: object, req: AuthRequest): Promise<T> {
   const instance = plainToInstance(dtoClass, plain);
   const errors = await validate(instance, {
     whitelist: true,
@@ -15,6 +15,7 @@ async function validateDto<T extends object>(dtoClass: new () => T, plain: objec
   });
 
   if (errors.length > 0) {
+    cleanupUploadedFiles(req);
     const messages = errors
       .map((e) => Object.values(e.constraints || {}))
       .flat()
@@ -64,18 +65,14 @@ export class PaidCustomerController {
 
   async create(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
-      const dto = await validateDto(CreatePaidCustomerDto, req.body);
+      const dto = await validateDto(CreatePaidCustomerDto, req.body, req);
 
       if (!req.user) {
         res.status(401).json({ success: false, message: "Unauthorized" });
         return;
       }
 
-      const filePaths = await processUploadedFiles(req, res, {
-        fieldName: "proofFiles",
-        maxCount: 5,
-        subfolder: "paid_customer_attachments",
-      });
+      const filePaths = getFilePathsFromRequest(req, "paid_customer_attachments");
 
       const result = await paidCustomerService.create({
         ...dto,
@@ -91,18 +88,14 @@ export class PaidCustomerController {
   async update(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
       const id = req.params.id as string;
-      const dto = await validateDto(UpdatePaidCustomerDto, req.body);
+      const dto = await validateDto(UpdatePaidCustomerDto, req.body, req);
 
       if (!req.user) {
         res.status(401).json({ success: false, message: "Unauthorized" });
         return;
       }
 
-      const filePaths = await processUploadedFiles(req, res, {
-        fieldName: "proofFiles",
-        maxCount: 5,
-        subfolder: "paid_customer_attachments",
-      });
+      const filePaths = getFilePathsFromRequest(req, "paid_customer_attachments");
       const bodyAttachmentUrls = req.body.attachment_urls as string[] | undefined;
       const mergedUrls = [...filePaths, ...(bodyAttachmentUrls || [])];
 
@@ -128,15 +121,12 @@ export class PaidCustomerController {
       }
 
       if (!description || typeof description !== "string") {
+        cleanupUploadedFiles(req);
         res.status(400).json({ success: false, message: "Description is required" });
         return;
       }
 
-      const filePaths = await processUploadedFiles(req, res, {
-        fieldName: "attachmentFiles",
-        maxCount: 5,
-        subfolder: "paid_customer_clarifications",
-      });
+      const filePaths = getFilePathsFromRequest(req, "paid_customer_clarifications");
 
       const result = await paidCustomerService.clarify(id, {
         description,
@@ -160,15 +150,12 @@ export class PaidCustomerController {
       }
 
       if (!description || typeof description !== "string") {
+        cleanupUploadedFiles(req);
         res.status(400).json({ success: false, message: "Description is required" });
         return;
       }
 
-      const filePaths = await processUploadedFiles(req, res, {
-        fieldName: "attachmentFiles",
-        maxCount: 5,
-        subfolder: "paid_customer_clarifications",
-      });
+      const filePaths = getFilePathsFromRequest(req, "paid_customer_clarifications");
 
       const result = await paidCustomerService.updateClarify(id, {
         description,
@@ -184,7 +171,7 @@ export class PaidCustomerController {
   async verify(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
       const id = req.params.id as string;
-      const dto = await validateDto(VerifyPaidCustomerDto, req.body);
+      const dto = await validateDto(VerifyPaidCustomerDto, req.body, req);
 
       if (!req.user) {
         res.status(401).json({ success: false, message: "Unauthorized" });

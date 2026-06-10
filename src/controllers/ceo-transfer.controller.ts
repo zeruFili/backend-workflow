@@ -5,9 +5,9 @@ import { AuthRequest } from "../middlewares/auth.middleware";
 import { AppError } from "../middlewares/error.middleware";
 import { ceoTransferService } from "../services/ceo-transfer.service";
 import { CreateCeoTransferDto, UpdateCeoTransferDto } from "../validators/ceo-transfer.dto";
-import { processUploadedFiles } from "../utils/upload.utils";
+import { getFilePathsFromRequest, cleanupUploadedFiles } from "../utils/upload.utils";
 
-async function validateDto<T extends object>(dtoClass: new () => T, plain: object): Promise<T> {
+async function validateDto<T extends object>(dtoClass: new () => T, plain: object, req: AuthRequest): Promise<T> {
   const instance = plainToInstance(dtoClass, plain);
   const errors = await validate(instance, {
     whitelist: true,
@@ -15,6 +15,7 @@ async function validateDto<T extends object>(dtoClass: new () => T, plain: objec
   });
 
   if (errors.length > 0) {
+    cleanupUploadedFiles(req);
     const messages = errors
       .map((e) => Object.values(e.constraints || {}))
       .flat()
@@ -55,13 +56,9 @@ export class CeoTransferController {
         return;
       }
 
-      const dto = await validateDto(CreateCeoTransferDto, req.body);
+      const dto = await validateDto(CreateCeoTransferDto, req.body, req);
 
-      const filePaths = await processUploadedFiles(req, res, {
-        fieldName: "attachmentFiles",
-        maxCount: 10,
-        subfolder: "ceo_transfers",
-      });
+      const filePaths = getFilePathsFromRequest(req, "ceo_transfers");
       const mergedUrls = [...filePaths, ...(dto.attachment_urls || [])];
 
       const result = await ceoTransferService.create(
@@ -83,13 +80,9 @@ export class CeoTransferController {
       }
 
       const id = req.params.id as string;
-      const dto = await validateDto(UpdateCeoTransferDto, req.body);
+      const dto = await validateDto(UpdateCeoTransferDto, req.body, req);
 
-      const filePaths = await processUploadedFiles(req, res, {
-        fieldName: "attachmentFiles",
-        maxCount: 10,
-        subfolder: "ceo_transfers",
-      });
+      const filePaths = getFilePathsFromRequest(req, "ceo_transfers");
       const bodyAttachmentUrls = req.body.attachment_urls as string[] | undefined;
       const mergedUrls = [...filePaths, ...(bodyAttachmentUrls || [])];
 

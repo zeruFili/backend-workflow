@@ -5,7 +5,7 @@ import { AuthRequest } from "../middlewares/auth.middleware";
 import { AppError } from "../middlewares/error.middleware";
 import { designerService } from "../services/designer.service";
 import { ReviewOutcome } from "../enums/review-outcome.enum";
-import { processUploadedFiles } from "../utils/upload.utils";
+import { getFilePathsFromRequest, cleanupUploadedFiles } from "../utils/upload.utils";
 import {
   CreateDesignerTaskDto,
   UpdateDesignerTaskDto,
@@ -17,7 +17,7 @@ import {
   PauseTaskDto,
 } from "../validators/designer.dto";
 
-async function validateDto<T extends object>(dtoClass: new () => T, plain: object): Promise<T> {
+async function validateDto<T extends object>(dtoClass: new () => T, plain: object, req: AuthRequest): Promise<T> {
   const instance = plainToInstance(dtoClass, plain);
   const errors = await validate(instance, {
     whitelist: true,
@@ -25,6 +25,7 @@ async function validateDto<T extends object>(dtoClass: new () => T, plain: objec
   });
 
   if (errors.length > 0) {
+    cleanupUploadedFiles(req);
     const messages = errors
       .map((e) => Object.values(e.constraints || {}))
       .flat()
@@ -97,13 +98,9 @@ export class DesignerController {
       if (bodyForValidation.story_point !== undefined) {
         bodyForValidation.story_point = parseInt(bodyForValidation.story_point as any, 10);
       }
-      const dto = await validateDto(CreateDesignerTaskDto, bodyForValidation);
+      const dto = await validateDto(CreateDesignerTaskDto, bodyForValidation, req);
 
-      const filePaths = await processUploadedFiles(req, res, {
-        fieldName: "attachmentFiles",
-        maxCount: 10,
-        subfolder: "designer_tasks",
-      });
+      const filePaths = getFilePathsFromRequest(req, "designer_tasks");
       const bodyAttachmentUrls = req.body.attachment_urls as string[] | undefined;
       const mergedUrls = [...filePaths, ...(bodyAttachmentUrls || [])];
 
@@ -132,13 +129,9 @@ export class DesignerController {
       if (bodyForValidation.story_point !== undefined) {
         bodyForValidation.story_point = parseInt(bodyForValidation.story_point as any, 10);
       }
-      const dto = await validateDto(UpdateDesignerTaskDto, bodyForValidation);
+      const dto = await validateDto(UpdateDesignerTaskDto, bodyForValidation, req);
 
-      const filePaths = await processUploadedFiles(req, res, {
-        fieldName: "attachmentFiles",
-        maxCount: 10,
-        subfolder: "designer_tasks",
-      });
+      const filePaths = getFilePathsFromRequest(req, "designer_tasks");
       const bodyAttachmentUrls = req.body.attachment_urls as string[] | undefined;
       const mergedUrls = [...filePaths, ...(bodyAttachmentUrls || [])];
 
@@ -161,7 +154,7 @@ export class DesignerController {
       }
 
       const taskId = req.params.id as string;
-      const dto = await validateDto(AssignDesignerDto, req.body);
+      const dto = await validateDto(AssignDesignerDto, req.body, req);
       const task = await designerService.assignDesigner(taskId, dto.designer_id, req.user.id);
       res.status(200).json({ success: true, data: task, message: "Designer assigned successfully" });
     } catch (error) {
@@ -177,7 +170,7 @@ export class DesignerController {
       }
 
       const taskId = req.params.id as string;
-      const dto = await validateDto(DesignApplicationDto, { designer_task_id: taskId, ...req.body });
+      const dto = await validateDto(DesignApplicationDto, { designer_task_id: taskId, ...req.body }, req);
       const application = await designerService.apply(taskId, req.user.id, dto.cover_note);
       res.status(201).json({ success: true, data: application, message: "Application submitted successfully" });
     } catch (error) {
@@ -220,13 +213,9 @@ export class DesignerController {
       }
 
       const taskId = req.params.id as string;
-      const dto = await validateDto(CreateDesignerSubmissionDto, req.body);
+      const dto = await validateDto(CreateDesignerSubmissionDto, req.body, req);
 
-      const filePaths = await processUploadedFiles(req, res, {
-        fieldName: "attachmentFiles",
-        maxCount: 10,
-        subfolder: "designer_submissions",
-      });
+      const filePaths = getFilePathsFromRequest(req, "designer_submissions");
       const bodyAttachmentUrls = req.body.attachment_urls as string[] | undefined;
       const mergedUrls = [...filePaths, ...(bodyAttachmentUrls || [])];
 
@@ -253,11 +242,7 @@ export class DesignerController {
       const submissionId = req.params.id as string;
       const { description, stage } = req.body;
 
-      const filePaths = await processUploadedFiles(req, res, {
-        fieldName: "attachmentFiles",
-        maxCount: 10,
-        subfolder: "designer_submissions",
-      });
+      const filePaths = getFilePathsFromRequest(req, "designer_submissions");
       const bodyAttachmentUrls = req.body.attachment_urls as string[] | undefined;
       const mergedUrls = [...filePaths, ...(bodyAttachmentUrls || [])];
 
@@ -281,7 +266,7 @@ export class DesignerController {
       }
 
       const submissionId = req.params.id as string;
-      const dto = await validateDto(CreateSubmissionReviewDto, req.body);
+      const dto = await validateDto(CreateSubmissionReviewDto, req.body, req);
       const review = await designerService.createSubmissionReview(
         submissionId,
         req.user.id,
@@ -302,7 +287,7 @@ export class DesignerController {
       }
 
       const taskId = req.params.id as string;
-      const dto = await validateDto(CreateTaskReviewDto, req.body);
+      const dto = await validateDto(CreateTaskReviewDto, req.body, req);
       const review = await designerService.createTaskReview(
         taskId,
         req.user.id,
@@ -346,7 +331,7 @@ export class DesignerController {
       }
 
       const taskId = req.params.id as string;
-      const dto = await validateDto(PauseTaskDto, req.body);
+      const dto = await validateDto(PauseTaskDto, req.body, req);
       const task = await designerService.pauseTask(taskId, dto.reason, req.user.id);
       res.status(200).json({ success: true, data: task, message: "Task paused successfully" });
     } catch (error) {

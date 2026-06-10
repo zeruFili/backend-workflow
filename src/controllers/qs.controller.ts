@@ -4,7 +4,7 @@ import { plainToInstance } from "class-transformer";
 import { AuthRequest } from "../middlewares/auth.middleware";
 import { AppError } from "../middlewares/error.middleware";
 import { quantitySurveyorService } from "../services/qs.service";
-import { processUploadedFiles } from "../utils/upload.utils";
+import { getFilePathsFromRequest, cleanupUploadedFiles } from "../utils/upload.utils";
 import {
   CreateQSTaskDto,
   UpdateQSTaskDto,
@@ -12,7 +12,7 @@ import {
   CreateQSReviewDto,
 } from "../validators/qs.dto";
 
-async function validateDto<T extends object>(dtoClass: new () => T, plain: object): Promise<T> {
+async function validateDto<T extends object>(dtoClass: new () => T, plain: object, req: AuthRequest): Promise<T> {
   const instance = plainToInstance(dtoClass, plain);
   const errors = await validate(instance, {
     whitelist: true,
@@ -20,6 +20,7 @@ async function validateDto<T extends object>(dtoClass: new () => T, plain: objec
   });
 
   if (errors.length > 0) {
+    cleanupUploadedFiles(req);
     const messages = errors
       .map((e) => Object.values(e.constraints || {}))
       .flat()
@@ -76,13 +77,9 @@ export class QuantitySurveyorController {
         return;
       }
 
-      const dto = await validateDto(CreateQSTaskDto, req.body);
+      const dto = await validateDto(CreateQSTaskDto, req.body, req);
 
-      const filePaths = await processUploadedFiles(req, res, {
-        fieldName: "attachmentFiles",
-        maxCount: 10,
-        subfolder: "qs_tasks",
-      });
+      const filePaths = getFilePathsFromRequest(req, "qs_tasks");
       const mergedUrls = [...filePaths, ...(dto.attachment_urls || [])];
 
       const task = await quantitySurveyorService.createTask(
@@ -98,13 +95,9 @@ export class QuantitySurveyorController {
   async updateTask(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
       const id = req.params.id as string;
-      const dto = await validateDto(UpdateQSTaskDto, req.body);
+      const dto = await validateDto(UpdateQSTaskDto, req.body, req);
 
-      const filePaths = await processUploadedFiles(req, res, {
-        fieldName: "attachmentFiles",
-        maxCount: 10,
-        subfolder: "qs_tasks",
-      });
+      const filePaths = getFilePathsFromRequest(req, "qs_tasks");
       const bodyAttachmentUrls = req.body.attachment_urls as string[] | undefined;
       const mergedUrls = [...filePaths, ...(bodyAttachmentUrls || [])];
 
@@ -126,13 +119,9 @@ export class QuantitySurveyorController {
       }
 
       const taskId = req.params.id as string;
-      const dto = await validateDto(CreateQSSubmissionDto, req.body);
+      const dto = await validateDto(CreateQSSubmissionDto, req.body, req);
 
-      const filePaths = await processUploadedFiles(req, res, {
-        fieldName: "attachmentFiles",
-        maxCount: 10,
-        subfolder: "qs_submissions",
-      });
+      const filePaths = getFilePathsFromRequest(req, "qs_submissions");
       const bodyAttachmentUrls = req.body.attachment_urls as string[] | undefined;
       const mergedUrls = [...filePaths, ...(bodyAttachmentUrls || [])];
 
@@ -166,7 +155,7 @@ export class QuantitySurveyorController {
       }
 
       const submissionId = req.params.id as string;
-      const dto = await validateDto(CreateQSReviewDto, req.body);
+      const dto = await validateDto(CreateQSReviewDto, req.body, req);
       const review = await quantitySurveyorService.createReview(
         submissionId,
         req.user.id,
@@ -190,15 +179,12 @@ export class QuantitySurveyorController {
       const { description, review_outcome } = req.body;
 
       if (!description || !review_outcome) {
+        cleanupUploadedFiles(req);
         res.status(400).json({ success: false, message: "Description and review_outcome are required" });
         return;
       }
 
-      const filePaths = await processUploadedFiles(req, res, {
-        fieldName: "attachmentFiles",
-        maxCount: 10,
-        subfolder: "qs_evaluations",
-      });
+      const filePaths = getFilePathsFromRequest(req, "qs_evaluations");
       const bodyAttachmentUrls = req.body.attachment_urls as string[] | undefined;
       const mergedUrls = [...filePaths, ...(bodyAttachmentUrls || [])];
 
@@ -224,11 +210,7 @@ export class QuantitySurveyorController {
       const id = req.params.id as string;
       const { description, review_outcome } = req.body;
 
-      const filePaths = await processUploadedFiles(req, res, {
-        fieldName: "attachmentFiles",
-        maxCount: 10,
-        subfolder: "qs_evaluations",
-      });
+      const filePaths = getFilePathsFromRequest(req, "qs_evaluations");
       const bodyAttachmentUrls = req.body.attachment_urls as string[] | undefined;
       const mergedUrls = [...filePaths, ...(bodyAttachmentUrls || [])];
 
