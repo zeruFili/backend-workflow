@@ -36,7 +36,7 @@ export class NotificationService {
     const [data, total] = await this.repo.findAndCount({
       where: { user_id: userId } as any,
       relations: ["from_user"],
-      order: { created_at: "DESC" },
+      order: { updated_at: "DESC" },
       skip,
       take: limit,
     });
@@ -74,12 +74,19 @@ export class NotificationService {
   }
 
   async markAllRead(userId: string) {
-    const result = await this.repo.update(
-      { user_id: userId as any, viewed: false },
-      { viewed: true }
-    );
+    const notifications = await this.repo.find({
+      where: { user_id: userId as any, viewed: false },
+    });
 
-    return { markedCount: result.affected ?? 0 };
+    for (const n of notifications) {
+      n.viewed = true;
+    }
+
+    if (notifications.length > 0) {
+      await this.repo.save(notifications);
+    }
+
+    return { markedCount: notifications.length };
   }
 }
 
