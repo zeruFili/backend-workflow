@@ -191,6 +191,10 @@ export class QuantitySurveyorService {
       throw new AppError(400, "Cannot submit to a deactive task");
     }
 
+    if (task.status === ReviewOutcome.REJECTED) {
+      throw new AppError(400, "Submission is not allowed because the parent task has been rejected.");
+    }
+
     const submission = new QuantitySurveyorSubmission();
     submission.quantity_surveyor_task_id = taskId;
     submission.description = description;
@@ -244,6 +248,10 @@ export class QuantitySurveyorService {
       relations: ["quantity_surveyor_task"],
     });
     if (!submission) throw new AppError(404, "Quantity surveyor submission not found");
+
+    if (submission.quantity_surveyor_task && submission.quantity_surveyor_task.status === ReviewOutcome.REJECTED) {
+      throw new AppError(400, "This submission cannot be updated because the parent task has been rejected.");
+    }
 
     if (params.description !== undefined) submission.description = params.description;
     if (params.attachment_urls !== undefined) {

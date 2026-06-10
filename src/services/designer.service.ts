@@ -452,7 +452,7 @@ export class DesignerService {
     }
 
     if (task.status === ReviewOutcome.REJECTED) {
-      throw new AppError(400, "Cannot submit to a rejected task");
+      throw new AppError(400, "Submission is not allowed because the parent task has been rejected.");
     }
 
     const resolvedStage = stage ?? task.stage ?? DesignerStage.CASE_STUDY;
@@ -518,6 +518,10 @@ export class DesignerService {
       relations: ["designer_task"],
     });
     if (!submission) throw new AppError(404, "Designer submission not found");
+
+    if (submission.designer_task && submission.designer_task.status === ReviewOutcome.REJECTED) {
+      throw new AppError(400, "This submission cannot be updated because the parent task has been rejected.");
+    }
 
     if (params.description !== undefined) submission.description = params.description;
     if (params.stage !== undefined) submission.stage = params.stage;

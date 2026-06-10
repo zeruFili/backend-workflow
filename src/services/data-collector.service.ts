@@ -203,6 +203,10 @@ export class DataCollectorService {
       throw new AppError(400, "Cannot submit to a deactive task");
     }
 
+    if (task.status === DataCollectorTaskStatus.REJECTED) {
+      throw new AppError(400, "Submission is not allowed because the parent task has been rejected.");
+    }
+
     const submission = new DataCollectorSubmission();
     submission.data_collector_task_id = taskId;
     submission.description = description;
@@ -245,6 +249,10 @@ export class DataCollectorService {
       relations: ["data_collector_task"],
     });
     if (!submission) throw new AppError(404, "Data collector submission not found");
+
+    if (submission.data_collector_task && submission.data_collector_task.status === DataCollectorTaskStatus.REJECTED) {
+      throw new AppError(400, "This submission cannot be updated because the parent task has been rejected.");
+    }
 
     if (params.description !== undefined) submission.description = params.description;
     if (params.attachment_urls !== undefined) {
