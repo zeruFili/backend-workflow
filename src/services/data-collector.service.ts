@@ -93,6 +93,36 @@ export class DataCollectorService {
     }
   }
 
+  private async notifyTaskAssignment(taskId: string, assignedUserId: string, fromUserId: string) {
+    const ceoGm = await this.userRepo.find({
+      where: [
+        { role: UserRole.CEO, is_active: true },
+        { role: UserRole.GENERAL_MANAGER, is_active: true },
+      ],
+    });
+
+    const recipients = new Set<string>();
+    recipients.add(assignedUserId);
+    for (const user of ceoGm) {
+      recipients.add(user.id);
+    }
+    recipients.delete(fromUserId);
+
+    const notifications = Array.from(recipients).map((recipientId) => ({
+      user_id: recipientId,
+      from_user_id: fromUserId,
+      resource_id: taskId,
+      resource_type: ResourceType.TASK_ASSIGNED,
+      parent_id: taskId,
+      parent_type: ParentType.DATA_COLLECTOR_TASK,
+      type: "New data collector task assigned",
+    }));
+
+    for (const n of notifications) {
+      await this.createNotification(n);
+    }
+  }
+
   async findAllTasks(params: PaginatedParams) {
     const { page, limit, status, assignedTo, search, currentUser } = params;
 
@@ -171,15 +201,7 @@ export class DataCollectorService {
     const saved = await this.taskRepo.save(task);
 
     if (saved.assigned_to_user_id) {
-      await this.createNotification({
-        user_id: saved.assigned_to_user_id,
-        from_user_id: assignedByUserId,
-        resource_id: saved.id,
-        resource_type: ResourceType.TASK_ASSIGNED,
-        parent_id: saved.id,
-        parent_type: ParentType.DATA_COLLECTOR_TASK,
-        type: "New data collector task assigned",
-      });
+      await this.notifyTaskAssignment(saved.id, saved.assigned_to_user_id, assignedByUserId);
     }
 
     return saved;
@@ -188,6 +210,8 @@ export class DataCollectorService {
   async updateTask(id: string, params: UpdateTaskParams, userId: string) {
     const task = await this.taskRepo.findOneBy({ id });
     if (!task) throw new AppError(404, "Data collector task not found");
+
+    const previousAssignee = task.assigned_to_user_id;
 
     if (params.title !== undefined) task.title = params.title;
     if (params.description !== undefined) task.description = params.description;
@@ -202,6 +226,14 @@ export class DataCollectorService {
     task.updated_at = new Date();
 
     const saved = await this.taskRepo.save(task);
+
+    if (
+      params.assigned_to_user_id !== undefined &&
+      params.assigned_to_user_id !== previousAssignee &&
+      params.assigned_to_user_id
+    ) {
+      await this.notifyTaskAssignment(saved.id, params.assigned_to_user_id, userId);
+    }
 
     await this.refreshResourceNotifications(id, userId);
 
@@ -512,7 +544,10 @@ export class DataCollectorService {
     const submissionsWithReviews = submissions.map((submission) => {
       const rawReviews = (reviewsBySubmission[submission.id] || []).map((r) => {
         const earliest = new Date(
-          Math.min(r.created_at.getTime(), r.updated_at.getTime())
+          Math.min(
+            r.created_at?.getTime() ?? r.updated_at?.getTime() ?? 0,
+            r.updated_at?.getTime() ?? r.created_at?.getTime() ?? 0
+          )
         );
         return { ...r, reviewer_user: pickSafeUserFields(r.reviewer_user), _sortTime: earliest };
       });
@@ -527,7 +562,10 @@ export class DataCollectorService {
       });
 
       const earliestSubmission = new Date(
-        Math.min(submission.created_at.getTime(), submission.updated_at.getTime())
+        Math.min(
+          submission.created_at?.getTime() ?? submission.updated_at?.getTime() ?? 0,
+          submission.updated_at?.getTime() ?? submission.created_at?.getTime() ?? 0
+        )
       );
 
       const subNotif = notificationMap.has(submission.id)

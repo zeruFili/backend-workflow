@@ -37,6 +37,7 @@ interface UpdateTaskParams {
   status?: ReviewOutcome;
   due_date?: string;
   attachment_urls?: string[];
+  assigned_to_user_id?: string;
 }
 
 export class QuantitySurveyorService {
@@ -88,6 +89,36 @@ export class QuantitySurveyorService {
 
     if (notifications.length > 0) {
       await this.notificationRepo.save(notifications);
+    }
+  }
+
+  private async notifyTaskAssignment(taskId: string, assignedUserId: string, fromUserId: string) {
+    const ceoGm = await this.userRepo.find({
+      where: [
+        { role: UserRole.CEO, is_active: true },
+        { role: UserRole.GENERAL_MANAGER, is_active: true },
+      ],
+    });
+
+    const recipients = new Set<string>();
+    recipients.add(assignedUserId);
+    for (const user of ceoGm) {
+      recipients.add(user.id);
+    }
+    recipients.delete(fromUserId);
+
+    const notifications = Array.from(recipients).map((recipientId) => ({
+      user_id: recipientId,
+      from_user_id: fromUserId,
+      resource_id: taskId,
+      resource_type: ResourceType.TASK_ASSIGNED,
+      parent_id: taskId,
+      parent_type: ParentType.QUANTITY_SURVEYOR_TASK,
+      type: "New quantity surveyor task assigned",
+    }));
+
+    for (const n of notifications) {
+      await this.createNotification(n);
     }
   }
 
@@ -169,15 +200,7 @@ export class QuantitySurveyorService {
     const saved = await this.taskRepo.save(task);
 
     if (saved.assigned_to_user_id) {
-      await this.createNotification({
-        user_id: saved.assigned_to_user_id,
-        from_user_id: assignedByUserId,
-        resource_id: saved.id,
-        resource_type: ResourceType.TASK_ASSIGNED,
-        parent_id: saved.id,
-        parent_type: ParentType.QUANTITY_SURVEYOR_TASK,
-        type: "New quantity surveyor task assigned",
-      });
+      await this.notifyTaskAssignment(saved.id, saved.assigned_to_user_id, assignedByUserId);
     }
 
     return saved;
@@ -187,10 +210,13 @@ export class QuantitySurveyorService {
     const task = await this.taskRepo.findOneBy({ id });
     if (!task) throw new AppError(404, "Quantity surveyor task not found");
 
+    const previousAssignee = task.assigned_to_user_id;
+
     if (params.title !== undefined) task.title = params.title;
     if (params.description !== undefined) task.description = params.description;
     if (params.status !== undefined) task.status = params.status;
     if (params.due_date !== undefined) task.due_date = params.due_date;
+    if (params.assigned_to_user_id !== undefined) task.assigned_to_user_id = params.assigned_to_user_id as any;
     if (params.attachment_urls !== undefined) {
       task.attachment_urls = syncAttachments(task.attachment_urls, params.attachment_urls) as any;
     }
@@ -199,6 +225,14 @@ export class QuantitySurveyorService {
     task.updated_at = new Date();
 
     const saved = await this.taskRepo.save(task);
+
+    if (
+      params.assigned_to_user_id !== undefined &&
+      params.assigned_to_user_id !== previousAssignee &&
+      params.assigned_to_user_id
+    ) {
+      await this.notifyTaskAssignment(saved.id, params.assigned_to_user_id, userId);
+    }
 
     await this.refreshResourceNotifications(id, userId);
 
@@ -506,7 +540,10 @@ export class QuantitySurveyorService {
     const submissionsWithReviews = submissions.map((submission) => {
       const rawReviews = (reviewsBySubmission[submission.id] || []).map((r) => {
         const earliest = new Date(
-          Math.min(r.created_at.getTime(), r.updated_at.getTime())
+          Math.min(
+            r.created_at?.getTime() ?? r.updated_at?.getTime() ?? 0,
+            r.updated_at?.getTime() ?? r.created_at?.getTime() ?? 0
+          )
         );
         return { ...r, reviewer_user: pickSafeUserFields(r.reviewer_user), _sortTime: earliest };
       });
@@ -521,7 +558,10 @@ export class QuantitySurveyorService {
       });
 
       const earliestSubmission = new Date(
-        Math.min(submission.created_at.getTime(), submission.updated_at.getTime())
+        Math.min(
+          submission.created_at?.getTime() ?? submission.updated_at?.getTime() ?? 0,
+          submission.updated_at?.getTime() ?? submission.created_at?.getTime() ?? 0
+        )
       );
 
       const subNotif = notificationMap.has(submission.id)

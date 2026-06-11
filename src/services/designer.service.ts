@@ -126,6 +126,36 @@ export class DesignerService {
     }
   }
 
+  private async notifyTaskAssignment(taskId: string, assignedUserId: string, fromUserId: string) {
+    const ceoGm = await this.userRepo.find({
+      where: [
+        { role: UserRole.CEO, is_active: true },
+        { role: UserRole.GENERAL_MANAGER, is_active: true },
+      ],
+    });
+
+    const recipients = new Set<string>();
+    recipients.add(assignedUserId);
+    for (const user of ceoGm) {
+      recipients.add(user.id);
+    }
+    recipients.delete(fromUserId);
+
+    const notifications = Array.from(recipients).map((recipientId) => ({
+      user_id: recipientId,
+      from_user_id: fromUserId,
+      resource_id: taskId,
+      resource_type: ResourceType.TASK_ASSIGNED,
+      parent_id: taskId,
+      parent_type: ParentType.DESIGNER_TASK,
+      type: "New designer task assigned",
+    }));
+
+    for (const n of notifications) {
+      await this.createNotification(n);
+    }
+  }
+
   private summarizeAssignedByUser(user?: User | null): AssignedByUserSummary | null {
     if (!user) {
       return null;
@@ -277,15 +307,7 @@ export class DesignerService {
     }
 
     if (saved.assigned_to_user_id) {
-      await this.createNotification({
-        user_id: saved.assigned_to_user_id,
-        from_user_id: assignedByUserId,
-        resource_id: saved.id,
-        resource_type: ResourceType.TASK_ASSIGNED,
-        parent_id: saved.id,
-        parent_type: ParentType.DESIGNER_TASK,
-        type: "You have been assigned to a new designer task",
-      });
+      await this.notifyTaskAssignment(saved.id, saved.assigned_to_user_id, assignedByUserId);
     }
 
     return saved;
@@ -305,6 +327,8 @@ export class DesignerService {
       throw new AppError(403, DESIGNER_TASK_LIST_FORBIDDEN_MESSAGE);
     }
 
+    const previousAssignee = task.assigned_to_user_id;
+
     if (params.title !== undefined) task.title = params.title;
     if (params.description !== undefined) task.description = params.description;
     if (params.status !== undefined) task.status = params.status;
@@ -321,6 +345,14 @@ export class DesignerService {
     task.updated_at = new Date();
 
     const saved = await this.taskRepo.save(task);
+
+    if (
+      params.assigned_to_user_id !== undefined &&
+      params.assigned_to_user_id !== previousAssignee &&
+      params.assigned_to_user_id
+    ) {
+      await this.notifyTaskAssignment(saved.id, params.assigned_to_user_id, currentUser.id);
+    }
 
     await this.refreshResourceNotifications(id, currentUser.id);
 
@@ -355,15 +387,7 @@ export class DesignerService {
       }
     }
 
-    await this.createNotification({
-      user_id: designerUserId,
-      from_user_id: assignedByUserId,
-      resource_id: taskId,
-      resource_type: ResourceType.TASK_ASSIGNED,
-      parent_id: taskId,
-      parent_type: ParentType.DESIGNER_TASK,
-      type: "You have been assigned to a designer task",
-    });
+    await this.notifyTaskAssignment(taskId, designerUserId, assignedByUserId);
 
     return task;
   }
@@ -929,7 +953,10 @@ export class DesignerService {
     const submissionsWithNotification = submissions.map((submission) => {
       const rawReviews = (reviewsBySubmission[submission.id] || []).map((r) => {
         const earliest = new Date(
-          Math.min(r.created_at.getTime(), r.updated_at.getTime())
+          Math.min(
+            r.created_at?.getTime() ?? r.updated_at?.getTime() ?? 0,
+            r.updated_at?.getTime() ?? r.created_at?.getTime() ?? 0
+          )
         );
         return { ...r, reviewer_user: pickSafeUserFields(r.reviewer_user), _sortTime: earliest };
       });
@@ -944,7 +971,10 @@ export class DesignerService {
       });
 
       const earliestSubmission = new Date(
-        Math.min(submission.created_at.getTime(), submission.updated_at.getTime())
+        Math.min(
+          submission.created_at?.getTime() ?? submission.updated_at?.getTime() ?? 0,
+          submission.updated_at?.getTime() ?? submission.created_at?.getTime() ?? 0
+        )
       );
 
       const subNotif = notificationMap.has(submission.id)

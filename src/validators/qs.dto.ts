@@ -46,6 +46,10 @@ export class UpdateQSTaskDto {
   @IsArray()
   @IsString({ each: true })
   attachment_urls?: string[];
+
+  @IsOptional()
+  @IsUUID()
+  assigned_to_user_id?: string;
 }
 
 export class CreateQSSubmissionDto {
