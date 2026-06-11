@@ -10,6 +10,7 @@ import {
   UpdateQSTaskDto,
   CreateQSSubmissionDto,
   CreateQSReviewDto,
+  UpdateQSReviewDto,
 } from "../validators/qs.dto";
 
 async function validateDto<T extends object>(dtoClass: new () => T, plain: object, req: AuthRequest): Promise<T> {
@@ -63,7 +64,7 @@ export class QuantitySurveyorController {
   async findTaskById(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
       const id = req.params.id as string;
-      const task = await quantitySurveyorService.findTaskById(id);
+      const task = await quantitySurveyorService.findTaskById(id, req.user);
       res.status(200).json({ success: true, data: task });
     } catch (error) {
       next(error);
@@ -147,7 +148,7 @@ export class QuantitySurveyorController {
   async getSubmissions(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
       const taskId = req.params.id as string;
-      const submissions = await quantitySurveyorService.getSubmissions(taskId);
+      const submissions = await quantitySurveyorService.getSubmissions(taskId, req.user);
       res.status(200).json({ success: true, data: submissions });
     } catch (error) {
       next(error);
@@ -287,6 +288,26 @@ export class QuantitySurveyorController {
       const submissionId = req.params.id as string;
       const reviews = await quantitySurveyorService.getReviews(submissionId);
       res.status(200).json({ success: true, data: reviews });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async updateReview(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      if (!req.user) {
+        res.status(401).json({ success: false, message: "Unauthorized" });
+        return;
+      }
+
+      const reviewId = req.params.id as string;
+      const dto = await validateDto(UpdateQSReviewDto, req.body, req);
+      const review = await quantitySurveyorService.updateReview(
+        reviewId,
+        { review_outcome: dto.review_outcome, description: dto.description },
+        req.user.id
+      );
+      res.status(200).json({ success: true, data: review, message: "Review updated successfully" });
     } catch (error) {
       next(error);
     }

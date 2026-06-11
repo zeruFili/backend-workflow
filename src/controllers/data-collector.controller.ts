@@ -64,7 +64,7 @@ export class DataCollectorController {
   async findTaskById(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
       const id = req.params.id as string;
-      const task = await dataCollectorService.findTaskById(id);
+      const task = await dataCollectorService.findTaskById(id, req.user);
       res.status(200).json({ success: true, data: task });
     } catch (error) {
       next(error);
@@ -175,7 +175,7 @@ export class DataCollectorController {
   async getSubmissions(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
       const taskId = req.params.id as string;
-      const submissions = await dataCollectorService.getSubmissions(taskId);
+      const submissions = await dataCollectorService.getSubmissions(taskId, req.user);
       res.status(200).json({ success: true, data: submissions });
     } catch (error) {
       next(error);
@@ -228,6 +228,21 @@ export class DataCollectorController {
       const submissionId = req.params.id as string;
       const reviews = await dataCollectorService.getReviews(submissionId);
       res.status(200).json({ success: true, data: reviews });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getSubmissionsWithReviews(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      if (!req.user) {
+        res.status(401).json({ success: false, message: "Unauthorized" });
+        return;
+      }
+
+      const taskId = req.params.id as string;
+      const result = await dataCollectorService.getSubmissionsWithReviews(taskId, req.user.id);
+      res.status(200).json({ success: true, data: result });
     } catch (error) {
       next(error);
     }

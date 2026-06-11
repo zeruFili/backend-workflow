@@ -61,3 +61,14 @@ export class CreateQSReviewDto {
   @Length(1, 5000)
   description: string;
 }
+
+export class UpdateQSReviewDto {
+  @IsOptional()
+  @IsEnum(ReviewOutcome)
+  review_outcome?: ReviewOutcome;
+
+  @IsOptional()
+  @IsString()
+  @Length(1, 5000)
+  description?: string;
+}

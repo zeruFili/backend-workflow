@@ -82,7 +82,7 @@ export class DesignerController {
   async findTaskById(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
       const id = req.params.id as string;
-      const task = await designerService.findTaskById(id);
+      const task = await designerService.findTaskById(id, req.user);
       res.status(200).json({ success: true, data: task });
     } catch (error) {
       next(error);
@@ -357,7 +357,7 @@ export class DesignerController {
   async getSubmissions(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
       const taskId = req.params.id as string;
-      const submissions = await designerService.getSubmissions(taskId);
+      const submissions = await designerService.getSubmissions(taskId, req.user);
       res.status(200).json({ success: true, data: submissions });
     } catch (error) {
       next(error);

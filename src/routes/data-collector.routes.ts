@@ -26,9 +26,9 @@ router.post(
   taskUploadMiddleware,
   (req, res, next) => dataCollectorController.createTask(req, res, next)
 );
-router.get("/data-collector-tasks/:id", authenticate, (req, res, next) => dataCollectorController.findTaskById(req, res, next));
+router.get("/data-collector-tasks/:id", authenticate, authorize(UserRole.CEO, UserRole.GENERAL_MANAGER, UserRole.DATA_COLLECTOR), (req, res, next) => dataCollectorController.findTaskById(req, res, next));
 router.patch("/data-collector-tasks/:id", authenticate, authorize(UserRole.CEO, UserRole.GENERAL_MANAGER), taskUploadMiddleware, (req, res, next) => dataCollectorController.updateTask(req, res, next));
-router.get("/data-collector-tasks/:id/submissions", authenticate, (req, res, next) => dataCollectorController.getSubmissions(req, res, next));
+router.get("/data-collector-tasks/:id/submissions", authenticate, authorize(UserRole.CEO, UserRole.GENERAL_MANAGER, UserRole.DATA_COLLECTOR), (req, res, next) => dataCollectorController.getSubmissions(req, res, next));
 router.post(
   "/data-collector-tasks/:id/submissions",
   authenticate,
@@ -43,6 +43,7 @@ router.patch(
   submissionUploadMiddleware,
   (req, res, next) => dataCollectorController.updateSubmission(req, res, next)
 );
+router.get("/data-collector-tasks/:id/submissions-with-reviews", authenticate, authorize(UserRole.CEO, UserRole.GENERAL_MANAGER, UserRole.DATA_COLLECTOR), (req, res, next) => dataCollectorController.getSubmissionsWithReviews(req, res, next));
 router.get("/data-collector-submissions/:id/reviews", authenticate, (req, res, next) => dataCollectorController.getReviews(req, res, next));
 router.post("/data-collector-submissions/:id/review", authenticate, authorize(UserRole.CEO, UserRole.GENERAL_MANAGER), (req, res, next) => dataCollectorController.createReview(req, res, next));
 router.patch("/data-collector-reviews/:id", authenticate, authorize(UserRole.CEO, UserRole.GENERAL_MANAGER), (req, res, next) => dataCollectorController.updateReview(req, res, next));

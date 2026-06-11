@@ -198,12 +198,24 @@ export class DesignerService {
     };
   }
 
-  async findTaskById(id: string) {
+  async findTaskById(id: string, currentUser?: { id: string; role: UserRole }) {
     const task = await this.taskRepo.findOne({
       where: { id },
       relations: ["assigned_to_user", "assigned_by_user"],
     });
     if (!task) throw new AppError(404, "Designer task not found");
+
+    if (currentUser) {
+      if (currentUser.role === UserRole.CEO || currentUser.role === UserRole.GENERAL_MANAGER) {
+        // CEO and GM can view any task
+      } else if (currentUser.role === UserRole.DESIGNER) {
+        if (task.assigned_to_user_id !== currentUser.id) {
+          throw new AppError(403, "You are not authorized to view this designer task.");
+        }
+      } else {
+        throw new AppError(403, DESIGNER_TASK_LIST_FORBIDDEN_MESSAGE);
+      }
+    }
 
     const submissions = await this.submissionRepo.find({
       where: { designer_task_id: id },
@@ -443,6 +455,10 @@ export class DesignerService {
     const task = await this.taskRepo.findOneBy({ id: taskId });
     if (!task) throw new AppError(404, "Designer task not found");
 
+    if (task.assigned_to_user_id !== userId) {
+      throw new AppError(403, "Only the assigned Designer can create submissions for this task.");
+    }
+
     if (task.task_state !== TaskState.ACTIVE) {
       throw new AppError(400, "Cannot submit to a deactive task");
     }
@@ -519,8 +535,24 @@ export class DesignerService {
     });
     if (!submission) throw new AppError(404, "Designer submission not found");
 
-    if (submission.designer_task && submission.designer_task.status === ReviewOutcome.REJECTED) {
-      throw new AppError(400, "This submission cannot be updated because the parent task has been rejected.");
+    const task = submission.designer_task;
+    if (task) {
+      if (task.assigned_to_user_id !== userId) {
+        throw new AppError(403, "Only the assigned Designer can update this submission.");
+      }
+
+      if (task.status === ReviewOutcome.REJECTED) {
+        throw new AppError(400, "This submission cannot be updated because the parent task has been rejected.");
+      }
+
+      if (task.task_state !== TaskState.ACTIVE) {
+        throw new AppError(400, "Cannot update submission for a deactive task.");
+      }
+    }
+
+    const existingReview = await this.submissionReviewRepo.findOneBy({ designer_submission_id: submissionId });
+    if (existingReview) {
+      throw new AppError(400, "Cannot update submission that has already been reviewed.");
     }
 
     if (params.description !== undefined) submission.description = params.description;
@@ -531,9 +563,9 @@ export class DesignerService {
 
     const saved = await this.submissionRepo.save(submission);
 
-    if (submission.designer_task) {
-      submission.designer_task.status = ReviewOutcome.PENDING;
-      await this.taskRepo.save(submission.designer_task);
+    if (task) {
+      task.status = ReviewOutcome.PENDING;
+      await this.taskRepo.save(task);
     }
 
     await this.refreshResourceNotifications(submissionId, userId);
@@ -555,6 +587,9 @@ export class DesignerService {
 
     const task = submission.designer_task;
     if (!task) throw new AppError(404, "Associated designer task not found for this submission");
+    if (task.task_state === TaskState.DEACTIVE) {
+      throw new AppError(400, "Cannot review a submission for a deactivated task");
+    }
 
     if (
       task.stage === DesignerStage.FINAL_STAGE &&
@@ -604,16 +639,22 @@ export class DesignerService {
     if (!review) throw new AppError(404, "Designer submission review not found");
 
     if (review.reviewer_user_id !== reviewerUserId) {
-      throw new AppError(403, "Only the original reviewer can update this review");
+      throw new AppError(403, "You are not authorized to update this review. Only the user who originally created the review can modify it.");
+    }
+
+    const submission = review.designer_submission;
+    if (!submission) throw new AppError(404, "Associated submission not found");
+
+    const task = submission.designer_task;
+    if (!task) throw new AppError(404, "Associated designer task not found");
+    if (task.task_state === TaskState.DEACTIVE) {
+      throw new AppError(400, "Cannot update review for a deactivated task");
     }
 
     const hoursSinceCreation = (Date.now() - review.created_at.getTime()) / (1000 * 60 * 60);
     if (hoursSinceCreation > 24) {
       throw new AppError(400, "Reviews can only be updated within 24 hours of creation");
     }
-
-    const submission = review.designer_submission;
-    if (!submission) throw new AppError(404, "Associated submission not found");
 
     const taskId = submission.designer_task_id;
 
@@ -626,8 +667,12 @@ export class DesignerService {
       throw new AppError(400, "Cannot update review: a newer submission exists for this task");
     }
 
-    const task = submission.designer_task;
-    if (!task) throw new AppError(404, "Associated designer task not found");
+    const otherReview = await this.submissionReviewRepo.findOneBy({
+      designer_submission_id: submission.id,
+    });
+    if (otherReview && otherReview.id !== reviewId) {
+      throw new AppError(400, "Another review already exists for this submission. This review cannot be edited.");
+    }
 
     if (params.review_outcome !== undefined) {
       review.review_outcome = params.review_outcome;
@@ -783,9 +828,21 @@ export class DesignerService {
     return saved;
   }
 
-  async getSubmissions(taskId: string) {
+  async getSubmissions(taskId: string, currentUser?: { id: string; role: UserRole }) {
     const task = await this.taskRepo.findOneBy({ id: taskId });
     if (!task) throw new AppError(404, "Designer task not found");
+
+    if (currentUser) {
+      if (currentUser.role === UserRole.CEO || currentUser.role === UserRole.GENERAL_MANAGER) {
+        // CEO and GM can view all submissions
+      } else if (currentUser.role === UserRole.DESIGNER) {
+        if (task.assigned_to_user_id !== currentUser.id) {
+          throw new AppError(403, "You are not authorized to view these submissions.");
+        }
+      } else {
+        throw new AppError(403, DESIGNER_TASK_LIST_FORBIDDEN_MESSAGE);
+      }
+    }
 
     return this.submissionRepo.find({
       where: { designer_task_id: taskId },

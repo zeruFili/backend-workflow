@@ -97,9 +97,12 @@ export class QuantitySurveyorService {
       .leftJoinAndSelect("t.assigned_to_user", "assigned_to_user")
       .leftJoinAndSelect("t.assigned_by_user", "assigned_by_user");
 
-    const isQS = currentUser.role === UserRole.QUANTITY_SURVEYOR;
-    if (isQS) {
+    if (currentUser.role === UserRole.CEO || currentUser.role === UserRole.GENERAL_MANAGER) {
+      // CEO and GM see all tasks
+    } else if (currentUser.role === UserRole.QUANTITY_SURVEYOR) {
       qb.andWhere("t.assigned_to_user_id = :userId", { userId: currentUser.id });
+    } else {
+      throw new AppError(403, "You are not authorized to view quantity surveyor tasks.");
     }
 
     if (status) qb.andWhere("t.status = :status", { status });
@@ -123,12 +126,24 @@ export class QuantitySurveyorService {
     };
   }
 
-  async findTaskById(id: string) {
+  async findTaskById(id: string, currentUser?: { id: string; role: UserRole }) {
     const task = await this.taskRepo.findOne({
       where: { id },
       relations: ["assigned_to_user", "assigned_by_user"],
     });
     if (!task) throw new AppError(404, "Quantity surveyor task not found");
+
+    if (currentUser) {
+      if (currentUser.role === UserRole.CEO || currentUser.role === UserRole.GENERAL_MANAGER) {
+        // CEO and GM can view any task
+      } else if (currentUser.role === UserRole.QUANTITY_SURVEYOR) {
+        if (task.assigned_to_user_id !== currentUser.id) {
+          throw new AppError(403, "You are not authorized to view this quantity surveyor task.");
+        }
+      } else {
+        throw new AppError(403, "You are not authorized to view quantity surveyor tasks.");
+      }
+    }
 
     const submissions = await this.submissionRepo.find({
       where: { quantity_surveyor_task_id: id },
@@ -187,6 +202,10 @@ export class QuantitySurveyorService {
     const task = await this.taskRepo.findOneBy({ id: taskId });
     if (!task) throw new AppError(404, "Quantity surveyor task not found");
 
+    if (task.assigned_to_user_id !== userId) {
+      throw new AppError(403, "Only the assigned Quantity Surveyor can create submissions for this task.");
+    }
+
     if (task.task_state !== TaskState.ACTIVE) {
       throw new AppError(400, "Cannot submit to a deactive task");
     }
@@ -228,9 +247,21 @@ export class QuantitySurveyorService {
     return saved;
   }
 
-  async getSubmissions(taskId: string) {
+  async getSubmissions(taskId: string, currentUser?: { id: string; role: UserRole }) {
     const task = await this.taskRepo.findOneBy({ id: taskId });
     if (!task) throw new AppError(404, "Quantity surveyor task not found");
+
+    if (currentUser) {
+      if (currentUser.role === UserRole.CEO || currentUser.role === UserRole.GENERAL_MANAGER) {
+        // CEO and GM can view all submissions
+      } else if (currentUser.role === UserRole.QUANTITY_SURVEYOR) {
+        if (task.assigned_to_user_id !== currentUser.id) {
+          throw new AppError(403, "You are not authorized to view these submissions.");
+        }
+      } else {
+        throw new AppError(403, "You are not authorized to view quantity surveyor submissions.");
+      }
+    }
 
     return this.submissionRepo.find({
       where: { quantity_surveyor_task_id: taskId },
@@ -249,8 +280,24 @@ export class QuantitySurveyorService {
     });
     if (!submission) throw new AppError(404, "Quantity surveyor submission not found");
 
-    if (submission.quantity_surveyor_task && submission.quantity_surveyor_task.status === ReviewOutcome.REJECTED) {
-      throw new AppError(400, "This submission cannot be updated because the parent task has been rejected.");
+    const task = submission.quantity_surveyor_task;
+    if (task) {
+      if (task.assigned_to_user_id !== userId) {
+        throw new AppError(403, "Only the assigned Quantity Surveyor can update this submission.");
+      }
+
+      if (task.task_state !== TaskState.ACTIVE) {
+        throw new AppError(400, "Cannot update submission for a deactive task.");
+      }
+
+      if (task.status === ReviewOutcome.REJECTED) {
+        throw new AppError(400, "This submission cannot be updated because the parent task has been rejected.");
+      }
+    }
+
+    const existingReview = await this.reviewRepo.findOneBy({ quantity_surveyor_submission_id: submissionId });
+    if (existingReview) {
+      throw new AppError(400, "Cannot update submission that has already been reviewed.");
     }
 
     if (params.description !== undefined) submission.description = params.description;
@@ -260,9 +307,9 @@ export class QuantitySurveyorService {
 
     const saved = await this.submissionRepo.save(submission);
 
-    if (submission.quantity_surveyor_task) {
-      submission.quantity_surveyor_task.status = ReviewOutcome.PENDING;
-      await this.taskRepo.save(submission.quantity_surveyor_task);
+    if (task) {
+      task.status = ReviewOutcome.PENDING;
+      await this.taskRepo.save(task);
     }
 
     await this.refreshResourceNotifications(submissionId, userId);
@@ -282,6 +329,12 @@ export class QuantitySurveyorService {
     });
     if (!submission) throw new AppError(404, "Quantity surveyor submission not found");
 
+    const task = submission.quantity_surveyor_task;
+    if (!task) throw new AppError(404, "Associated quantity surveyor task not found");
+    if (task.task_state === TaskState.DEACTIVE) {
+      throw new AppError(400, "Cannot review a submission for a deactivated task");
+    }
+
     const review = new QuantitySurveyorReview();
     review.quantity_surveyor_submission_id = submissionId;
     review.reviewer_user_id = reviewerUserId;
@@ -290,18 +343,15 @@ export class QuantitySurveyorService {
 
     const saved = await this.reviewRepo.save(review);
 
-    const task = submission.quantity_surveyor_task;
-    if (task) {
-      task.status = reviewOutcome;
-      await this.taskRepo.save(task);
-    }
+    task.status = reviewOutcome;
+    await this.taskRepo.save(task);
 
     submission.review_status = reviewOutcome === ReviewOutcome.APPROVED
       ? SubmissionReviewStatus.APPROVED
       : SubmissionReviewStatus.REVISION_REQUIRED;
     await this.submissionRepo.save(submission);
 
-    if (task?.assigned_to_user_id) {
+    if (task.assigned_to_user_id) {
       await this.createNotification({
         user_id: task.assigned_to_user_id,
         from_user_id: reviewerUserId,
@@ -312,6 +362,70 @@ export class QuantitySurveyorService {
         type: `Your submission was ${reviewOutcome}`,
       });
     }
+
+    return saved;
+  }
+
+  async updateReview(
+    reviewId: string,
+    params: { review_outcome?: ReviewOutcome; description?: string },
+    currentUserId: string
+  ) {
+    const review = await this.reviewRepo.findOne({
+      where: { id: reviewId },
+      relations: ["quantity_surveyor_submission", "quantity_surveyor_submission.quantity_surveyor_task"],
+    });
+    if (!review) throw new AppError(404, "Quantity surveyor review not found");
+
+    if (review.reviewer_user_id !== currentUserId) {
+      throw new AppError(403, "Only the original reviewer can update this review.");
+    }
+
+    const submission = review.quantity_surveyor_submission;
+    if (!submission) throw new AppError(404, "Associated submission not found");
+
+    const task = submission.quantity_surveyor_task;
+    if (!task) throw new AppError(404, "Associated quantity surveyor task not found");
+    if (task.task_state === TaskState.DEACTIVE) {
+      throw new AppError(400, "Cannot update review for a deactivated task");
+    }
+
+    const taskId = submission.quantity_surveyor_task_id;
+
+    const latestSubmission = await this.submissionRepo.findOne({
+      where: { quantity_surveyor_task_id: taskId },
+      order: { created_at: "DESC" },
+    });
+
+    if (latestSubmission && latestSubmission.id !== submission.id) {
+      throw new AppError(400, "A newer submission exists for this task. Cannot update review.");
+    }
+
+    const otherReview = await this.reviewRepo.findOneBy({
+      quantity_surveyor_submission_id: submission.id,
+    });
+    if (otherReview && otherReview.id !== reviewId) {
+      throw new AppError(400, "Another review already exists for this submission. This review cannot be edited.");
+    }
+
+    const twentyFourHours = 24 * 60 * 60 * 1000;
+    const reviewAge = Date.now() - review.created_at.getTime();
+    if (reviewAge > twentyFourHours) {
+      throw new AppError(400, "Reviews can only be updated within 24 hours of creation.");
+    }
+
+    if (params.review_outcome !== undefined) {
+      review.review_outcome = params.review_outcome;
+      task.status = params.review_outcome;
+      await this.taskRepo.save(task);
+    }
+    if (params.description !== undefined) {
+      review.description = params.description;
+    }
+
+    const saved = await this.reviewRepo.save(review);
+
+    await this.refreshResourceNotifications(reviewId, currentUserId);
 
     return saved;
   }
@@ -340,6 +454,14 @@ export class QuantitySurveyorService {
     const task = await this.taskRepo.findOneBy({ id: taskId });
     if (!task) throw new AppError(404, "Quantity surveyor task not found");
 
+    if (task.task_state !== TaskState.ACTIVE) {
+      throw new AppError(400, "Cannot evaluate a deactive task");
+    }
+
+    if (task.status === ReviewOutcome.REJECTED) {
+      throw new AppError(400, "Cannot evaluate a rejected task.");
+    }
+
     const submission = new QuantitySurveyorSubmission();
     submission.quantity_surveyor_task_id = taskId;
     submission.description = params.description;
@@ -365,6 +487,14 @@ export class QuantitySurveyorService {
     const task = await this.taskRepo.findOneBy({ id: taskId });
     if (!task) throw new AppError(404, "Quantity surveyor task not found");
 
+    if (task.task_state !== TaskState.ACTIVE) {
+      throw new AppError(400, "Cannot evaluate a deactive task");
+    }
+
+    if (task.status === ReviewOutcome.REJECTED) {
+      throw new AppError(400, "Cannot evaluate a rejected task.");
+    }
+
     const submission = new QuantitySurveyorSubmission();
     submission.quantity_surveyor_task_id = taskId;
     submission.description = params.description || "Evaluation update";
@@ -385,7 +515,10 @@ export class QuantitySurveyorService {
   }
 
   async decide(evaluationId: string, decision: string, description?: string, userId?: string) {
-    const submission = await this.submissionRepo.findOneBy({ id: evaluationId });
+    const submission = await this.submissionRepo.findOne({
+      where: { id: evaluationId },
+      relations: ["quantity_surveyor_task"],
+    });
     if (!submission) throw new AppError(404, "Evaluation not found");
 
     const review = new QuantitySurveyorReview();
@@ -396,7 +529,7 @@ export class QuantitySurveyorService {
     await this.reviewRepo.save(review);
 
     if (decision === "APPROVED" || decision === "approved") {
-      const task = await this.taskRepo.findOneBy({ id: submission.quantity_surveyor_task_id });
+      const task = submission.quantity_surveyor_task;
       if (task) {
         task.status = ReviewOutcome.APPROVED;
         await this.taskRepo.save(task);

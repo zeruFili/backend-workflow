@@ -26,7 +26,7 @@ router.post(
   taskUploadMiddleware,
   (req, res, next) => designerController.createTask(req, res, next)
 );
-router.get("/designer-tasks/:id", authenticate, (req, res, next) => designerController.findTaskById(req, res, next));
+router.get("/designer-tasks/:id", authenticate, authorize(UserRole.CEO, UserRole.GENERAL_MANAGER, UserRole.DESIGNER), (req, res, next) => designerController.findTaskById(req, res, next));
 router.patch("/designer-tasks/:id", authenticate, authorize(UserRole.CEO, UserRole.GENERAL_MANAGER), taskUploadMiddleware, (req, res, next) => designerController.updateTask(req, res, next));
 router.post("/designer-tasks/:id/assign", authenticate, authorize(UserRole.CEO, UserRole.GENERAL_MANAGER), (req, res, next) => designerController.assignDesigner(req, res, next));
 router.post(
@@ -36,7 +36,7 @@ router.post(
   (req, res, next) => designerController.apply(req, res, next)
 );
 router.get("/designer-tasks/:id/applications", authenticate, authorize(UserRole.CEO, UserRole.GENERAL_MANAGER), (req, res, next) => designerController.listApplications(req, res, next));
-router.get("/designer-tasks/:id/submissions", authenticate, (req, res, next) => designerController.getSubmissions(req, res, next));
+router.get("/designer-tasks/:id/submissions", authenticate, authorize(UserRole.CEO, UserRole.GENERAL_MANAGER, UserRole.DESIGNER), (req, res, next) => designerController.getSubmissions(req, res, next));
 router.post(
   "/designer-tasks/:id/submissions",
   authenticate,
@@ -47,7 +47,7 @@ router.post(
 router.patch(
   "/designer-tasks/submit/:id",
   authenticate,
-  authorize(UserRole.DESIGNER, UserRole.CEO, UserRole.GENERAL_MANAGER),
+  authorize(UserRole.DESIGNER),
   submissionUploadMiddleware,
   (req, res, next) => designerController.updateSubmission(req, res, next)
 );
