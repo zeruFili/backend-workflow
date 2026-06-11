@@ -1,5 +1,5 @@
 import {
-  Entity, PrimaryGeneratedColumn, Column, CreateDateColumn,
+  Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn,
   ManyToOne, JoinColumn, Index,
 } from "typeorm";
 import { User } from "./User";
@@ -47,7 +47,7 @@ export class DataCollectorTask {
   @CreateDateColumn({ type: "timestamptz", default: () => "NOW()" })
   created_at: Date;
 
-  @Column({ type: "timestamptz", nullable: true })
+  @UpdateDateColumn({ type: "timestamptz", default: () => "NOW()" })
   updated_at: Date;
 
   @Column({ type: "uuid", nullable: true })
