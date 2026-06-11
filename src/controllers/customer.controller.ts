@@ -5,6 +5,7 @@ import { AuthRequest } from "../middlewares/auth.middleware";
 import { AppError } from "../middlewares/error.middleware";
 import { customerService } from "../services/customer.service";
 import { CreateCustomerDto, UpdateCustomerDto } from "../validators/customer.dto";
+import { UserRole } from "../enums/user-role.enum";
 
 async function validateDto<T extends object>(dtoClass: new () => T, plain: object): Promise<T> {
   const instance = plainToInstance(dtoClass, plain);
@@ -32,6 +33,8 @@ export class CustomerController {
       const category = req.query.category as string | undefined;
       const paid = req.query.paid !== undefined ? req.query.paid === "true" : undefined;
       const search = req.query.search as string | undefined;
+      const sortBy = req.query.sortBy as string | undefined;
+      const order = req.query.order as string | undefined;
 
       if (!req.user) {
         res.status(401).json({ success: false, message: "Unauthorized" });
@@ -44,6 +47,8 @@ export class CustomerController {
         category,
         paid,
         search,
+        sortBy,
+        order,
         userId: req.user.id,
         userRole: req.user.role,
       });
@@ -60,6 +65,39 @@ export class CustomerController {
 
       const result = await customerService.findById(id);
       res.status(200).json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async findAllForCeo(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const page = Math.max(1, parseInt(req.query.page as string) || 1);
+      const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 20));
+      const category = req.query.category as string | undefined;
+      const paid = req.query.paid !== undefined ? req.query.paid === "true" : undefined;
+      const search = req.query.search as string | undefined;
+      const sortBy = req.query.sortBy as string | undefined;
+      const order = req.query.order as string | undefined;
+
+      if (!req.user) {
+        res.status(401).json({ success: false, message: "Unauthorized" });
+        return;
+      }
+
+      const result = await customerService.findAll({
+        page,
+        limit,
+        category,
+        paid,
+        search,
+        sortBy,
+        order,
+        userId: req.user.id,
+        userRole: UserRole.CEO,
+      });
+
+      res.status(200).json({ success: true, ...result });
     } catch (error) {
       next(error);
     }

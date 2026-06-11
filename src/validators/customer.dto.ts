@@ -85,4 +85,9 @@ export class UpdateCustomerDto {
   @IsString()
   @Length(0, 5000)
   notes?: string;
+
+  @IsOptional()
+  @IsString()
+  @Length(1, 50)
+  status?: string;
 }

@@ -11,7 +11,9 @@ import { errorHandler, notFound } from "./middlewares/error.middleware";
 
 import authRoutes from "./routes/auth.routes";
 import userRoutes from "./routes/user.routes";
+import customerRoutes from "./routes/customer.routes";
 import paidCustomerRoutes from "./routes/paid-customer.routes";
+import allCustomerRequestsRoutes from "./routes/all-customer-requests.routes";
 import qsRoutes from "./routes/qs.routes";
 import notificationRoutes from "./routes/notification.routes";
 import dataCollectorRoutes from "./routes/data-collector.routes";
@@ -30,6 +32,8 @@ app.use("/uploads", express.static(path.join(__dirname, "..", "uploads")));
 
 app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/users", userRoutes);
+app.use("/api/v1/customer-requests", customerRoutes);
+app.use("/api/v1/all-customer-requests", allCustomerRequestsRoutes);
 app.use("/api/v1/paid-customers", paidCustomerRoutes);
 app.use("/api/v1", ceoTransferRoutes);
 app.use("/api/v1", qsRoutes);

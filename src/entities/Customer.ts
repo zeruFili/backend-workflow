@@ -3,6 +3,7 @@ import {
   ManyToOne, JoinColumn, Index,
 } from "typeorm";
 import { User } from "./User";
+import { CustomerRequestStatus } from "../enums/customer-request-status.enum";
 
 @Entity("customer")
 export class Customer {
@@ -46,6 +47,9 @@ export class Customer {
 
   @Column({ type: "boolean", default: false })
   paid: boolean;
+
+  @Column({ type: "varchar", length: 50, default: "new" })
+  status: string;
 
   @CreateDateColumn({ type: "timestamptz", default: () => "NOW()" })
   created_at: Date;

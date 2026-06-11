@@ -12,6 +12,8 @@ interface PaginatedParams {
   category?: string;
   paid?: boolean;
   search?: string;
+  sortBy?: string;
+  order?: string;
   userId: string;
   userRole: string;
 }
@@ -26,6 +28,7 @@ interface CreateParams {
   preferred_start_date?: string;
   budget?: number;
   notes?: string;
+  status?: string;
 }
 
 interface UpdateParams {
@@ -38,13 +41,14 @@ interface UpdateParams {
   preferred_start_date?: string;
   budget?: number;
   notes?: string;
+  status?: string;
 }
 
 export class CustomerService {
   private repo = AppDataSource.getRepository(Customer);
 
   async findAll(params: PaginatedParams) {
-    const { page, limit, category, paid, search, userId, userRole } = params;
+    const { page, limit, category, paid, search, sortBy, order, userId, userRole } = params;
 
     const qb = this.repo.createQueryBuilder("c")
       .leftJoinAndSelect("c.marketing_user", "marketing_user");
@@ -66,7 +70,9 @@ export class CustomerService {
       );
     }
 
-    qb.orderBy("c.created_at", "DESC");
+    const sortColumn = sortBy === "customerName" ? "c.customer_name" : "c.created_at";
+    const sortOrder = order === "asc" ? "ASC" : "DESC";
+    qb.orderBy(sortColumn, sortOrder);
 
     const skip = (page - 1) * limit;
     const [data, total] = await qb.skip(skip).take(limit).getManyAndCount();
@@ -128,6 +134,7 @@ export class CustomerService {
     customer.budget = params.budget ?? null as any;
     customer.notes = params.notes ?? null as any;
     customer.paid = false;
+    customer.status = "new";
 
     return this.repo.save(customer);
   }
@@ -136,6 +143,10 @@ export class CustomerService {
     const customer = await this.repo.findOneBy({ id });
     if (!customer) {
       throw new AppError(404, "Customer not found");
+    }
+
+    if (customer.paid) {
+      throw new AppError(409, "Cannot update a paid customer request");
     }
 
     if (customer.marketing_user_id !== userId && userRole !== UserRole.CEO) {
@@ -169,6 +180,7 @@ export class CustomerService {
     if (params.service_description !== undefined) customer.service_description = params.service_description;
     if (params.budget !== undefined) customer.budget = params.budget;
     if (params.notes !== undefined) customer.notes = params.notes;
+    if (params.status !== undefined) customer.status = params.status;
 
     return this.repo.save(customer);
   }
@@ -188,6 +200,7 @@ export class CustomerService {
     }
 
     customer.paid = true;
+    customer.status = "paid";
     return this.repo.save(customer);
   }
 
@@ -195,6 +208,10 @@ export class CustomerService {
     const customer = await this.repo.findOneBy({ id });
     if (!customer) {
       throw new AppError(404, "Customer not found");
+    }
+
+    if (customer.paid) {
+      throw new AppError(409, "Cannot delete a paid customer request");
     }
 
     if (customer.marketing_user_id !== userId && userRole !== UserRole.CEO) {
