@@ -1,5 +1,5 @@
 import {
-  Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn,
+  Entity, PrimaryGeneratedColumn, Column, CreateDateColumn,
   ManyToOne, JoinColumn, Index, Check,
 } from "typeorm";
 import { DesignerTask } from "./DesignerTask";
@@ -48,6 +48,6 @@ export class DesignerTaskReview {
   @CreateDateColumn({ type: "timestamptz", default: () => "NOW()" })
   created_at: Date;
 
-  @UpdateDateColumn({ type: "timestamptz", default: () => "NOW()", nullable: true })
+  @Column({ type: "timestamptz", nullable: true })
   updated_at: Date;
 }

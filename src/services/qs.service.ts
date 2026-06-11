@@ -26,7 +26,7 @@ interface PaginatedParams {
 interface CreateTaskParams {
   title: string;
   description: string;
-  assigned_to_user_id: string;
+  assigned_to_user_id?: string;
   due_date: string;
   attachment_urls?: string[];
 }
@@ -160,7 +160,7 @@ export class QuantitySurveyorService {
     task.title = params.title;
     task.description = params.description;
     task.assigned_by_user_id = assignedByUserId;
-    task.assigned_to_user_id = params.assigned_to_user_id;
+    task.assigned_to_user_id = (params.assigned_to_user_id ?? null) as any;
     task.due_date = params.due_date;
     task.status = ReviewOutcome.PENDING;
     task.task_state = TaskState.ACTIVE;
@@ -168,15 +168,17 @@ export class QuantitySurveyorService {
 
     const saved = await this.taskRepo.save(task);
 
-    await this.createNotification({
-      user_id: saved.assigned_to_user_id,
-      from_user_id: assignedByUserId,
-      resource_id: saved.id,
-      resource_type: ResourceType.TASK_ASSIGNED,
-      parent_id: saved.id,
-      parent_type: ParentType.QUANTITY_SURVEYOR_TASK,
-      type: "New quantity surveyor task assigned",
-    });
+    if (saved.assigned_to_user_id) {
+      await this.createNotification({
+        user_id: saved.assigned_to_user_id,
+        from_user_id: assignedByUserId,
+        resource_id: saved.id,
+        resource_type: ResourceType.TASK_ASSIGNED,
+        parent_id: saved.id,
+        parent_type: ParentType.QUANTITY_SURVEYOR_TASK,
+        type: "New quantity surveyor task assigned",
+      });
+    }
 
     return saved;
   }
@@ -194,6 +196,7 @@ export class QuantitySurveyorService {
     }
 
     task.updated_by = userId as any;
+    task.updated_at = new Date();
 
     const saved = await this.taskRepo.save(task);
 
@@ -228,6 +231,7 @@ export class QuantitySurveyorService {
 
     task.status = ReviewOutcome.PENDING;
     task.updated_by = userId as any;
+    task.updated_at = new Date();
     await this.taskRepo.save(task);
 
     const ceoGm = await this.userRepo.find({
@@ -315,6 +319,7 @@ export class QuantitySurveyorService {
     if (task) {
       task.status = ReviewOutcome.PENDING;
       task.updated_by = userId as any;
+    task.updated_at = new Date();
       await this.taskRepo.save(task);
     }
 
@@ -351,6 +356,7 @@ export class QuantitySurveyorService {
 
     task.status = reviewOutcome;
     task.updated_by = reviewerUserId as any;
+    task.updated_at = new Date();
     await this.taskRepo.save(task);
 
     submission.review_status = reviewOutcome === ReviewOutcome.APPROVED
@@ -425,6 +431,7 @@ export class QuantitySurveyorService {
       review.review_outcome = params.review_outcome;
       task.status = params.review_outcome;
       task.updated_by = currentUserId as any;
+      task.updated_at = new Date();
       await this.taskRepo.save(task);
     }
     if (params.description !== undefined) {
@@ -628,6 +635,7 @@ export class QuantitySurveyorService {
       if (task) {
         task.status = ReviewOutcome.APPROVED;
         task.updated_by = userId as any;
+    task.updated_at = new Date();
         await this.taskRepo.save(task);
       }
     }

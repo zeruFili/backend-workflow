@@ -4,7 +4,8 @@ import { AppDataSource } from "../config/data-source";
 import { User } from "../entities/User";
 import { UserRole } from "../enums/user-role.enum";
 import { AppError } from "../middlewares/error.middleware";
-import { pickSafeUserFields, pickCeoUserFields, SafeUserOutput, CeoUserOutput } from "../utils/response.utils";
+import { pickCeoUserFields, CeoUserOutput } from "../utils/response.utils";
+import { getUserDetails, UserDetails } from "../utils/user-details.util";
 
 interface PaginatedResult<T> {
   data: T[];
@@ -48,8 +49,12 @@ const userRepo = () => AppDataSource.getRepository(User);
 const parsedBcryptCost = Number(process.env.BCRYPT_COST);
 const BCRYPT_COST = Number.isFinite(parsedBcryptCost) && parsedBcryptCost > 0 ? parsedBcryptCost : 12;
 
-function sanitizeUser(user: User): SafeUserOutput {
-  return pickSafeUserFields(user)!;
+function sanitizeUser(user: User): UserDetails {
+  return {
+    id: user.id,
+    fullName: user.full_name,
+    role: user.role,
+  };
 }
 
 export class UserService {
@@ -100,15 +105,15 @@ export class UserService {
     };
   }
 
-  async findById(id: string): Promise<SafeUserOutput> {
-    const user = await userRepo().findOne({ where: { id } });
+  async findById(id: string): Promise<UserDetails> {
+    const user = await getUserDetails(id);
     if (!user) {
       throw new AppError(404, "User not found");
     }
-    return sanitizeUser(user);
+    return user;
   }
 
-  async create(dto: CreateUserInput): Promise<SafeUserOutput> {
+  async create(dto: CreateUserInput): Promise<UserDetails> {
     if (dto.role === UserRole.CEO) {
       throw new AppError(400, "Cannot create a user with CEO role");
     }
@@ -138,7 +143,7 @@ export class UserService {
     id: string,
     dto: UpdateUserInput,
     currentUser: CurrentUser
-  ): Promise<SafeUserOutput> {
+  ): Promise<UserDetails> {
     const user = await userRepo().findOne({ where: { id } });
     if (!user) {
       throw new AppError(404, "User not found");
@@ -182,6 +187,8 @@ export class UserService {
       user.is_active = dto.is_active;
     }
 
+    user.updated_at = new Date();
+
     const saved = await userRepo().save(user);
     return sanitizeUser(saved);
   }
@@ -200,6 +207,7 @@ export class UserService {
     }
 
     user.is_active = false;
+    user.updated_at = new Date();
     await userRepo().save(user);
   }
 
@@ -207,7 +215,7 @@ export class UserService {
     id: string,
     dto: UpdateUserStatusInput,
     currentUser: CurrentUser
-  ): Promise<SafeUserOutput> {
+  ): Promise<UserDetails> {
     const user = await userRepo().findOne({ where: { id } });
     if (!user) {
       throw new AppError(404, "User not found");
@@ -228,6 +236,8 @@ export class UserService {
     if (dto.role !== undefined) {
       user.role = dto.role;
     }
+
+    user.updated_at = new Date();
 
     const saved = await userRepo().save(user);
     return sanitizeUser(saved);

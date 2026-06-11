@@ -1,5 +1,5 @@
 import {
-  Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn,
+  Entity, PrimaryGeneratedColumn, Column, CreateDateColumn,
   ManyToOne, JoinColumn, Index,
 } from "typeorm";
 import { QuantitySurveyorTask } from "./QuantitySurveyorTask";
@@ -30,6 +30,6 @@ export class QuantitySurveyorSubmission {
   @CreateDateColumn({ type: "timestamptz", default: () => "NOW()" })
   created_at: Date;
 
-  @UpdateDateColumn({ type: "timestamptz", default: () => "NOW()", nullable: true })
+  @Column({ type: "timestamptz", nullable: true })
   updated_at: Date;
 }

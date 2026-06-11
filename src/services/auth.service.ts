@@ -4,6 +4,7 @@ import { AppDataSource } from "../config/data-source";
 import { User } from "../entities/User";
 import { AppError } from "../middlewares/error.middleware";
 import { pickSafeUserFields, SafeUserOutput } from "../utils/response.utils";
+import { getUserDetails, UserDetails } from "../utils/user-details.util";
 
 const userRepo = () => AppDataSource.getRepository(User);
 
@@ -51,6 +52,7 @@ export class AuthService {
     }
 
     user.last_login_at = new Date();
+    user.updated_at = new Date();
     await userRepo().save(user);
 
     const accessToken = generateAccessToken({
@@ -84,16 +86,17 @@ export class AuthService {
     }
 
     user.password_hash = await bcrypt.hash(newPassword, BCRYPT_COST);
+    user.updated_at = new Date();
     await userRepo().save(user);
   }
 
-  async getMe(userId: string): Promise<SafeUserOutput> {
-    const user = await userRepo().findOne({ where: { id: userId } });
+  async getMe(userId: string): Promise<UserDetails> {
+    const user = await getUserDetails(userId);
     if (!user) {
       throw new AppError(404, "User not found");
     }
 
-    return sanitizeUser(user);
+    return user;
   }
 }
 

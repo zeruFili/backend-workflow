@@ -1,5 +1,5 @@
 import {
-  Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn,
+  Entity, PrimaryGeneratedColumn, Column, CreateDateColumn,
   ManyToOne, JoinColumn, Index,
 } from "typeorm";
 import { User } from "./User";
@@ -12,7 +12,7 @@ export class QuantitySurveyorTask {
   @PrimaryGeneratedColumn("uuid")
   id: string;
 
-  @Column({ type: "uuid" })
+  @Column({ type: "uuid", nullable: true })
   assigned_to_user_id: string;
 
   @ManyToOne(() => User)
@@ -41,7 +41,7 @@ export class QuantitySurveyorTask {
   @Column({ type: "date" })
   due_date: string;
 
-  @Column({ type: "text", array: true })
+  @Column({ type: "text", array: true, nullable: true })
   attachment_urls: string[];
 
   @Column({ type: "uuid", nullable: true })
@@ -54,6 +54,6 @@ export class QuantitySurveyorTask {
   @CreateDateColumn({ type: "timestamptz", default: () => "NOW()" })
   created_at: Date;
 
-  @UpdateDateColumn({ type: "timestamptz", default: () => "NOW()", nullable: true })
+  @Column({ type: "timestamptz", nullable: true })
   updated_at: Date;
 }

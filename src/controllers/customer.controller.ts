@@ -130,7 +130,7 @@ export class CustomerController {
         return;
       }
 
-      const result = await customerService.update(id, dto, req.user.id, req.user.role);
+      const result = await customerService.update(id, dto, req.user.id);
 
       res.status(200).json({ success: true, data: result });
     } catch (error) {
@@ -147,7 +147,7 @@ export class CustomerController {
         return;
       }
 
-      const result = await customerService.markAsPaid(id, req.user.id, req.user.role);
+      const result = await customerService.markAsPaid(id, req.user.id);
 
       res.status(200).json({ success: true, data: result, message: "Customer marked as paid" });
     } catch (error) {
@@ -164,7 +164,7 @@ export class CustomerController {
         return;
       }
 
-      await customerService.delete(id, req.user.id, req.user.role);
+      await customerService.delete(id, req.user.id);
 
       res.status(200).json({ success: true, message: "Customer deleted" });
     } catch (error) {

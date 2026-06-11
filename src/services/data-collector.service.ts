@@ -199,6 +199,7 @@ export class DataCollectorService {
       task.attachment_urls = syncAttachments(task.attachment_urls, params.attachment_urls) as any;
     }
     task.updated_by = userId as any;
+    task.updated_at = new Date();
 
     const saved = await this.taskRepo.save(task);
 
@@ -232,6 +233,7 @@ export class DataCollectorService {
 
     task.status = DataCollectorTaskStatus.PENDING;
     task.updated_by = userId as any;
+    task.updated_at = new Date();
     await this.taskRepo.save(task);
 
     const ceoGm = await this.userRepo.find({
@@ -297,6 +299,7 @@ export class DataCollectorService {
     if (task) {
       task.status = DataCollectorTaskStatus.PENDING;
       task.updated_by = userId as any;
+    task.updated_at = new Date();
       await this.taskRepo.save(task);
     }
 
@@ -358,6 +361,7 @@ export class DataCollectorService {
       : reviewOutcome as unknown as DataCollectorTaskStatus;
     task.status = mappedStatus;
     task.updated_by = reviewerUserId as any;
+    task.updated_at = new Date();
     await this.taskRepo.save(task);
 
     if (task.assigned_to_user_id) {
@@ -438,6 +442,7 @@ export class DataCollectorService {
         : params.review_outcome as unknown as DataCollectorTaskStatus;
       task.status = mappedStatus;
       task.updated_by = currentUserId as any;
+      task.updated_at = new Date();
       await this.taskRepo.save(task);
     }
 

@@ -1,5 +1,5 @@
 import {
-  Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn,
+  Entity, PrimaryGeneratedColumn, Column, CreateDateColumn,
   ManyToOne, JoinColumn, Index,
 } from "typeorm";
 import { User } from "./User";
@@ -54,6 +54,6 @@ export class Customer {
   @CreateDateColumn({ type: "timestamptz", default: () => "NOW()" })
   created_at: Date;
 
-  @UpdateDateColumn({ type: "timestamptz", default: () => "NOW()", nullable: true })
+  @Column({ type: "timestamptz", nullable: true })
   updated_at: Date;
 }

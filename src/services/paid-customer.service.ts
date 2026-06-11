@@ -138,6 +138,7 @@ export class PaidCustomerService {
     const saved = await this.repo.save(paidCustomer);
 
     customer.paid = true;
+    customer.updated_at = new Date();
     await this.customerRepo.save(customer);
 
     await this.createNotifications(
@@ -163,6 +164,7 @@ export class PaidCustomerService {
     }
 
     paidCustomer.status = params.review_outcome;
+    paidCustomer.updated_at = new Date();
     await this.repo.save(paidCustomer);
 
     let submission = await this.submissionRepo.findOne({
@@ -293,6 +295,8 @@ export class PaidCustomerService {
     if (params.attachment_urls !== undefined) {
       paidCustomer.attachment_urls = syncAttachments(paidCustomer.attachment_urls, params.attachment_urls) as any;
     }
+
+    paidCustomer.updated_at = new Date();
 
     return this.repo.save(paidCustomer);
   }

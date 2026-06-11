@@ -318,6 +318,7 @@ export class DesignerService {
     }
 
     task.updated_by = currentUser.id as any;
+    task.updated_at = new Date();
 
     const saved = await this.taskRepo.save(task);
 
@@ -341,6 +342,7 @@ export class DesignerService {
 
     task.assigned_to_user_id = designerUserId as any;
     task.updated_by = assignedByUserId as any;
+    task.updated_at = new Date();
     await this.taskRepo.save(task);
 
     const pendingApplications = await this.applicationRepo.find({
@@ -502,6 +504,7 @@ export class DesignerService {
     task.status = ReviewOutcome.PENDING;
     task.stage = resolvedStage;
     task.updated_by = userId as any;
+    task.updated_at = new Date();
     await this.taskRepo.save(task);
 
     const ceoGm = await this.userRepo.find({
@@ -568,6 +571,7 @@ export class DesignerService {
     if (task) {
       task.status = ReviewOutcome.PENDING;
       task.updated_by = userId as any;
+    task.updated_at = new Date();
       await this.taskRepo.save(task);
     }
 
@@ -606,6 +610,7 @@ export class DesignerService {
 
     task.status = reviewOutcome;
     task.updated_by = reviewerUserId as any;
+    task.updated_at = new Date();
     await this.taskRepo.save(task);
 
     const review = new DesignerSubmissionReview();
@@ -682,6 +687,7 @@ export class DesignerService {
       review.review_outcome = params.review_outcome;
       task.status = params.review_outcome;
       task.updated_by = reviewerUserId as any;
+    task.updated_at = new Date();
       await this.taskRepo.save(task);
     }
 
@@ -995,6 +1001,7 @@ export class DesignerService {
 
     task.is_paused = true;
     task.updated_by = userId as any;
+    task.updated_at = new Date();
     await this.taskRepo.save(task);
 
     if (task.assigned_to_user_id) {
@@ -1036,6 +1043,7 @@ export class DesignerService {
 
     task.is_paused = false;
     task.updated_by = userId as any;
+    task.updated_at = new Date();
     await this.taskRepo.save(task);
 
     if (task.assigned_to_user_id) {
@@ -1066,6 +1074,7 @@ export class DesignerService {
 
     task.task_state = TaskState.DEACTIVE;
     task.updated_by = removedByUserId as any;
+    task.updated_at = new Date();
     await this.taskRepo.save(task);
 
     return task;

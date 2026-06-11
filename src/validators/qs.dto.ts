@@ -10,8 +10,9 @@ export class CreateQSTaskDto {
   @Length(1, 5000)
   description: string;
 
+  @IsOptional()
   @IsUUID()
-  assigned_to_user_id: string;
+  assigned_to_user_id?: string;
 
   @IsString()
   due_date: string;

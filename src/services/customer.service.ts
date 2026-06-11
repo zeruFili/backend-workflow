@@ -139,7 +139,7 @@ export class CustomerService {
     return this.repo.save(customer);
   }
 
-  async update(id: string, params: UpdateParams, userId: string, userRole: string) {
+  async update(id: string, params: UpdateParams, userId: string) {
     const customer = await this.repo.findOneBy({ id });
     if (!customer) {
       throw new AppError(404, "Customer not found");
@@ -149,8 +149,8 @@ export class CustomerService {
       throw new AppError(409, "Cannot update a paid customer request");
     }
 
-    if (customer.marketing_user_id !== userId && userRole !== UserRole.CEO) {
-      throw new AppError(403, "Only the creator or CEO can update this customer");
+    if (customer.marketing_user_id !== userId) {
+      throw new AppError(403, "Only the creator can update this customer request");
     }
 
     if (params.customer_phone !== undefined) {
@@ -182,17 +182,19 @@ export class CustomerService {
     if (params.notes !== undefined) customer.notes = params.notes;
     if (params.status !== undefined) customer.status = params.status;
 
+    customer.updated_at = new Date();
+
     return this.repo.save(customer);
   }
 
-  async markAsPaid(id: string, userId: string, userRole: string) {
+  async markAsPaid(id: string, userId: string) {
     const customer = await this.repo.findOneBy({ id });
     if (!customer) {
       throw new AppError(404, "Customer not found");
     }
 
-    if (customer.marketing_user_id !== userId && userRole !== UserRole.CEO) {
-      throw new AppError(403, "Only the creator or CEO can mark this customer as paid");
+    if (customer.marketing_user_id !== userId) {
+      throw new AppError(403, "Only the creator can mark this customer as paid");
     }
 
     if (customer.paid) {
@@ -201,10 +203,11 @@ export class CustomerService {
 
     customer.paid = true;
     customer.status = "paid";
+    customer.updated_at = new Date();
     return this.repo.save(customer);
   }
 
-  async delete(id: string, userId: string, userRole: string) {
+  async delete(id: string, userId: string) {
     const customer = await this.repo.findOneBy({ id });
     if (!customer) {
       throw new AppError(404, "Customer not found");
@@ -214,8 +217,8 @@ export class CustomerService {
       throw new AppError(409, "Cannot delete a paid customer request");
     }
 
-    if (customer.marketing_user_id !== userId && userRole !== UserRole.CEO) {
-      throw new AppError(403, "Only the creator or CEO can delete this customer");
+    if (customer.marketing_user_id !== userId) {
+      throw new AppError(403, "Only the creator can delete this customer request");
     }
 
     await this.repo.remove(customer);

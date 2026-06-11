@@ -36,7 +36,7 @@ export class NotificationService {
     const [data, total] = await this.repo.findAndCount({
       where: { user_id: userId } as any,
       relations: ["from_user"],
-      order: { updated_at: "DESC" },
+      order: { created_at: "DESC" },
       skip,
       take: limit,
     });
@@ -70,6 +70,7 @@ export class NotificationService {
     }
 
     notification.viewed = true;
+    notification.updated_at = new Date();
     return this.repo.save(notification);
   }
 
@@ -80,6 +81,7 @@ export class NotificationService {
 
     for (const n of notifications) {
       n.viewed = true;
+      n.updated_at = new Date();
     }
 
     if (notifications.length > 0) {

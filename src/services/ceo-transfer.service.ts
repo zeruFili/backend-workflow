@@ -1,10 +1,10 @@
 import { AppDataSource } from "../config/data-source";
 import { CeoTransfer } from "../entities/CeoTransfer";
-import { User } from "../entities/User";
 import { Notification } from "../entities/Notification";
 import { AppError } from "../middlewares/error.middleware";
 import { pickSafeUserFields } from "../utils/response.utils";
 import { syncAttachments } from "../utils/upload.utils";
+import { getUserDetails } from "../utils/user-details.util";
 
 interface CreateTransferParams {
   finance_user_id: string;
@@ -24,7 +24,6 @@ interface UpdateTransferParams {
 
 export class CeoTransferService {
   private repo = AppDataSource.getRepository(CeoTransfer);
-  private userRepo = AppDataSource.getRepository(User);
   private notificationRepo = AppDataSource.getRepository(Notification);
 
   private async createNotification(params: {
@@ -90,10 +89,10 @@ export class CeoTransferService {
   }
 
   async create(params: CreateTransferParams, userId: string) {
-    const financeUser = await this.userRepo.findOneBy({ id: params.finance_user_id });
+    const financeUser = await getUserDetails(params.finance_user_id);
     if (!financeUser) throw new AppError(404, "Finance user not found");
 
-    const ceoUser = await this.userRepo.findOneBy({ id: params.ceo_user_id });
+    const ceoUser = await getUserDetails(params.ceo_user_id);
     if (!ceoUser) throw new AppError(404, "CEO user not found");
 
     const transfer = new CeoTransfer();
@@ -129,6 +128,8 @@ export class CeoTransferService {
     if (params.attachment_urls !== undefined) {
       transfer.attachment_urls = syncAttachments(transfer.attachment_urls, params.attachment_urls) as any;
     }
+
+    transfer.updated_at = new Date();
 
     return this.repo.save(transfer);
   }
