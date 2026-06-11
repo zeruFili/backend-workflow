@@ -231,6 +231,7 @@ export class DataCollectorService {
     const saved = await this.submissionRepo.save(submission);
 
     task.status = DataCollectorTaskStatus.PENDING;
+    task.updated_by = userId as any;
     await this.taskRepo.save(task);
 
     const ceoGm = await this.userRepo.find({
@@ -295,6 +296,7 @@ export class DataCollectorService {
 
     if (task) {
       task.status = DataCollectorTaskStatus.PENDING;
+      task.updated_by = userId as any;
       await this.taskRepo.save(task);
     }
 

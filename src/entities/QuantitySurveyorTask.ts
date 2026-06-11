@@ -44,9 +44,16 @@ export class QuantitySurveyorTask {
   @Column({ type: "text", array: true })
   attachment_urls: string[];
 
+  @Column({ type: "uuid", nullable: true })
+  updated_by: string;
+
+  @ManyToOne(() => User)
+  @JoinColumn({ name: "updated_by" })
+  updated_by_user: User;
+
   @CreateDateColumn({ type: "timestamptz", default: () => "NOW()" })
   created_at: Date;
 
-  @UpdateDateColumn({ type: "timestamptz", default: () => "NOW()" })
+  @UpdateDateColumn({ type: "timestamptz", default: () => "NOW()", nullable: true })
   updated_at: Date;
 }

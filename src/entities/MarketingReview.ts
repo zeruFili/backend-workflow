@@ -35,6 +35,6 @@ export class MarketingReview {
   @CreateDateColumn({ type: "timestamptz", default: () => "NOW()" })
   created_at: Date;
 
-  @UpdateDateColumn({ type: "timestamptz", default: () => "NOW()" })
+  @UpdateDateColumn({ type: "timestamptz", default: () => "NOW()", nullable: true })
   updated_at: Date;
 }

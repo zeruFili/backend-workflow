@@ -142,11 +142,12 @@ export class DesignerService {
     return this.summarizeAssignedByUser(user);
   }
 
-  private sanitizeDesignerTask<T extends { assigned_by_user?: User | null; assigned_to_user?: User | null }>(task: T) {
+  private sanitizeDesignerTask<T extends { assigned_by_user?: User | null; assigned_to_user?: User | null; updated_by_user?: User | null }>(task: T) {
     return {
       ...task,
       assigned_by_user: this.summarizeAssignedByUser(task.assigned_by_user),
       assigned_to_user: pickSafeUserFields(task.assigned_to_user ?? null),
+      updated_by_user: pickSafeUserFields(task.updated_by_user ?? null),
     };
   }
 
@@ -171,7 +172,8 @@ export class DesignerService {
 
     const qb = this.taskRepo.createQueryBuilder("t")
       .leftJoinAndSelect("t.assigned_to_user", "assigned_to_user")
-      .leftJoinAndSelect("t.assigned_by_user", "assigned_by_user");
+      .leftJoinAndSelect("t.assigned_by_user", "assigned_by_user")
+      .leftJoinAndSelect("t.updated_by_user", "updated_by_user");
 
     this.applyTaskListVisibilityScope(qb, currentUser);
 
@@ -201,7 +203,7 @@ export class DesignerService {
   async findTaskById(id: string, currentUser?: { id: string; role: UserRole }) {
     const task = await this.taskRepo.findOne({
       where: { id },
-      relations: ["assigned_to_user", "assigned_by_user"],
+      relations: ["assigned_to_user", "assigned_by_user", "updated_by_user"],
     });
     if (!task) throw new AppError(404, "Designer task not found");
 
@@ -298,7 +300,7 @@ export class DesignerService {
         throw new AppError(403, "Only the General Manager who created this task can update it");
       }
     } else if (currentUser.role === UserRole.CEO) {
-      task.updated_by = currentUser.id as any;
+      // CEO can update any task
     } else {
       throw new AppError(403, DESIGNER_TASK_LIST_FORBIDDEN_MESSAGE);
     }
@@ -315,9 +317,7 @@ export class DesignerService {
       task.attachment_urls = syncAttachments(task.attachment_urls, params.attachment_urls) as any;
     }
 
-    if (currentUser.role === UserRole.CEO) {
-      task.updated_by = currentUser.id as any;
-    }
+    task.updated_by = currentUser.id as any;
 
     const saved = await this.taskRepo.save(task);
 
@@ -340,6 +340,7 @@ export class DesignerService {
     if (!designer) throw new AppError(404, "Designer not found or not active");
 
     task.assigned_to_user_id = designerUserId as any;
+    task.updated_by = assignedByUserId as any;
     await this.taskRepo.save(task);
 
     const pendingApplications = await this.applicationRepo.find({
@@ -500,6 +501,7 @@ export class DesignerService {
 
     task.status = ReviewOutcome.PENDING;
     task.stage = resolvedStage;
+    task.updated_by = userId as any;
     await this.taskRepo.save(task);
 
     const ceoGm = await this.userRepo.find({
@@ -565,6 +567,7 @@ export class DesignerService {
 
     if (task) {
       task.status = ReviewOutcome.PENDING;
+      task.updated_by = userId as any;
       await this.taskRepo.save(task);
     }
 
@@ -602,6 +605,7 @@ export class DesignerService {
     }
 
     task.status = reviewOutcome;
+    task.updated_by = reviewerUserId as any;
     await this.taskRepo.save(task);
 
     const review = new DesignerSubmissionReview();
@@ -677,6 +681,7 @@ export class DesignerService {
     if (params.review_outcome !== undefined) {
       review.review_outcome = params.review_outcome;
       task.status = params.review_outcome;
+      task.updated_by = reviewerUserId as any;
       await this.taskRepo.save(task);
     }
 
@@ -989,6 +994,7 @@ export class DesignerService {
     await this.pausedTaskRepo.save(pausedTask);
 
     task.is_paused = true;
+    task.updated_by = userId as any;
     await this.taskRepo.save(task);
 
     if (task.assigned_to_user_id) {
@@ -1029,6 +1035,7 @@ export class DesignerService {
     }
 
     task.is_paused = false;
+    task.updated_by = userId as any;
     await this.taskRepo.save(task);
 
     if (task.assigned_to_user_id) {
@@ -1058,6 +1065,7 @@ export class DesignerService {
     await this.removalRepo.save(removal);
 
     task.task_state = TaskState.DEACTIVE;
+    task.updated_by = removedByUserId as any;
     await this.taskRepo.save(task);
 
     return task;

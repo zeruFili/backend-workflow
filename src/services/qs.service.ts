@@ -51,6 +51,7 @@ export class QuantitySurveyorService {
       ...task,
       assigned_to_user: pickSafeUserFields(task.assigned_to_user),
       assigned_by_user: pickSafeUserFields(task.assigned_by_user),
+      updated_by_user: pickSafeUserFields(task.updated_by_user),
     };
   }
 
@@ -95,7 +96,8 @@ export class QuantitySurveyorService {
 
     const qb = this.taskRepo.createQueryBuilder("t")
       .leftJoinAndSelect("t.assigned_to_user", "assigned_to_user")
-      .leftJoinAndSelect("t.assigned_by_user", "assigned_by_user");
+      .leftJoinAndSelect("t.assigned_by_user", "assigned_by_user")
+      .leftJoinAndSelect("t.updated_by_user", "updated_by_user");
 
     if (currentUser.role === UserRole.CEO || currentUser.role === UserRole.GENERAL_MANAGER) {
       // CEO and GM see all tasks
@@ -129,7 +131,7 @@ export class QuantitySurveyorService {
   async findTaskById(id: string, currentUser?: { id: string; role: UserRole }) {
     const task = await this.taskRepo.findOne({
       where: { id },
-      relations: ["assigned_to_user", "assigned_by_user"],
+      relations: ["assigned_to_user", "assigned_by_user", "updated_by_user"],
     });
     if (!task) throw new AppError(404, "Quantity surveyor task not found");
 
@@ -191,6 +193,8 @@ export class QuantitySurveyorService {
       task.attachment_urls = syncAttachments(task.attachment_urls, params.attachment_urls) as any;
     }
 
+    task.updated_by = userId as any;
+
     const saved = await this.taskRepo.save(task);
 
     await this.refreshResourceNotifications(id, userId);
@@ -223,6 +227,7 @@ export class QuantitySurveyorService {
     const saved = await this.submissionRepo.save(submission);
 
     task.status = ReviewOutcome.PENDING;
+    task.updated_by = userId as any;
     await this.taskRepo.save(task);
 
     const ceoGm = await this.userRepo.find({
@@ -309,6 +314,7 @@ export class QuantitySurveyorService {
 
     if (task) {
       task.status = ReviewOutcome.PENDING;
+      task.updated_by = userId as any;
       await this.taskRepo.save(task);
     }
 
@@ -344,6 +350,7 @@ export class QuantitySurveyorService {
     const saved = await this.reviewRepo.save(review);
 
     task.status = reviewOutcome;
+    task.updated_by = reviewerUserId as any;
     await this.taskRepo.save(task);
 
     submission.review_status = reviewOutcome === ReviewOutcome.APPROVED
@@ -417,6 +424,7 @@ export class QuantitySurveyorService {
     if (params.review_outcome !== undefined) {
       review.review_outcome = params.review_outcome;
       task.status = params.review_outcome;
+      task.updated_by = currentUserId as any;
       await this.taskRepo.save(task);
     }
     if (params.description !== undefined) {
@@ -619,6 +627,7 @@ export class QuantitySurveyorService {
       const task = submission.quantity_surveyor_task;
       if (task) {
         task.status = ReviewOutcome.APPROVED;
+        task.updated_by = userId as any;
         await this.taskRepo.save(task);
       }
     }
