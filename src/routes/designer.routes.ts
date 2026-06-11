@@ -37,6 +37,7 @@ router.post(
 );
 router.get("/designer-tasks/:id/applications", authenticate, authorize(UserRole.CEO, UserRole.GENERAL_MANAGER), (req, res, next) => designerController.listApplications(req, res, next));
 router.get("/designer-tasks/:id/submissions", authenticate, authorize(UserRole.CEO, UserRole.GENERAL_MANAGER, UserRole.DESIGNER), (req, res, next) => designerController.getSubmissions(req, res, next));
+router.get("/designer-tasks/:id/submissions-with-reviews", authenticate, authorize(UserRole.CEO, UserRole.GENERAL_MANAGER, UserRole.DESIGNER), (req, res, next) => designerController.getSubmissionsWithReviews(req, res, next));
 router.post(
   "/designer-tasks/:id/submissions",
   authenticate,

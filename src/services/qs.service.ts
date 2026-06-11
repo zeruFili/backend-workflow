@@ -446,6 +446,93 @@ export class QuantitySurveyorService {
     }));
   }
 
+  async getSubmissionsWithReviews(taskId: string, userId: string) {
+    const task = await this.taskRepo.findOneBy({ id: taskId });
+    if (!task) throw new AppError(404, "Quantity surveyor task not found");
+
+    const submissions = await this.submissionRepo.find({
+      where: { quantity_surveyor_task_id: taskId },
+    });
+
+    const allReviews = submissions.length > 0
+      ? await this.reviewRepo.find({
+          where: submissions.map((s) => ({ quantity_surveyor_submission_id: s.id } as any)),
+          relations: ["reviewer_user"],
+        })
+      : [];
+
+    const reviewsBySubmission: Record<string, QuantitySurveyorReview[]> = {};
+    for (const r of allReviews) {
+      if (!reviewsBySubmission[r.quantity_surveyor_submission_id]) {
+        reviewsBySubmission[r.quantity_surveyor_submission_id] = [];
+      }
+      reviewsBySubmission[r.quantity_surveyor_submission_id].push(r);
+    }
+
+    const unreadNotifications = await this.notificationRepo.find({
+      where: {
+        user_id: userId,
+        parent_id: taskId,
+        viewed: false,
+      },
+    });
+
+    const notificationMap = new Map<string, string>();
+    for (const n of unreadNotifications) {
+      if (!notificationMap.has(n.resource_id)) {
+        notificationMap.set(n.resource_id, n.id);
+      }
+    }
+
+    const hasTaskNotification = notificationMap.has(taskId)
+      ? { hasNotification: true, notificationId: notificationMap.get(taskId) }
+      : { hasNotification: false, notificationId: null };
+
+    const submissionsWithReviews = submissions.map((submission) => {
+      const rawReviews = (reviewsBySubmission[submission.id] || []).map((r) => {
+        const earliest = new Date(
+          Math.min(r.created_at.getTime(), r.updated_at.getTime())
+        );
+        return { ...r, reviewer_user: pickSafeUserFields(r.reviewer_user), _sortTime: earliest };
+      });
+
+      rawReviews.sort((a, b) => a._sortTime.getTime() - b._sortTime.getTime());
+
+      const reviews = rawReviews.map(({ _sortTime, ...r }) => {
+        const hasNotif = notificationMap.has(r.id)
+          ? { hasNotification: true, notificationId: notificationMap.get(r.id) }
+          : { hasNotification: false, notificationId: null };
+        return { ...r, ...hasNotif };
+      });
+
+      const earliestSubmission = new Date(
+        Math.min(submission.created_at.getTime(), submission.updated_at.getTime())
+      );
+
+      const subNotif = notificationMap.has(submission.id)
+        ? { hasNotification: true, notificationId: notificationMap.get(submission.id) }
+        : { hasNotification: false, notificationId: null };
+
+      return {
+        submissionId: submission.id,
+        ...subNotif,
+        submission: {
+          ...submission,
+          reviews,
+        },
+        _sortTime: earliestSubmission,
+      };
+    });
+
+    submissionsWithReviews.sort((a, b) => a._sortTime.getTime() - b._sortTime.getTime());
+
+    return {
+      taskId,
+      taskNotification: hasTaskNotification,
+      submissions: submissionsWithReviews.map(({ _sortTime, ...rest }) => rest),
+    };
+  }
+
   async evaluate(
     taskId: string,
     params: { description: string; review_outcome: string; attachment_urls?: string[] },

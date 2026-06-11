@@ -866,6 +866,111 @@ export class DesignerService {
     }));
   }
 
+  async getSubmissionsWithReviews(taskId: string, userId: string) {
+    const task = await this.taskRepo.findOneBy({ id: taskId });
+    if (!task) throw new AppError(404, "Designer task not found");
+
+    const submissions = await this.submissionRepo.find({
+      where: { designer_task_id: taskId },
+    });
+
+    const allReviews = submissions.length > 0
+      ? await this.submissionReviewRepo.find({
+          where: submissions.map((s) => ({ designer_submission_id: s.id } as any)),
+          relations: ["reviewer_user"],
+        })
+      : [];
+
+    const reviewsBySubmission: Record<string, DesignerSubmissionReview[]> = {};
+    for (const r of allReviews) {
+      if (!reviewsBySubmission[r.designer_submission_id]) {
+        reviewsBySubmission[r.designer_submission_id] = [];
+      }
+      reviewsBySubmission[r.designer_submission_id].push(r);
+    }
+
+    const unreadNotifications = await this.notificationRepo.find({
+      where: {
+        user_id: userId,
+        parent_id: taskId,
+        viewed: false,
+      },
+    });
+
+    const notificationMap = new Map<string, string>();
+    for (const n of unreadNotifications) {
+      if (!notificationMap.has(n.resource_id)) {
+        notificationMap.set(n.resource_id, n.id);
+      }
+    }
+
+    const hasTaskNotification = notificationMap.has(taskId)
+      ? { hasNotification: true, notificationId: notificationMap.get(taskId) }
+      : { hasNotification: false, notificationId: null };
+
+    const stageKeyMap: Record<string, string> = {
+      [DesignerStage.CASE_STUDY]: "caseStudy",
+      [DesignerStage.DESIGNING]: "designing",
+      [DesignerStage.RENDERING]: "rendering",
+      [DesignerStage.FINAL_STAGE]: "finalStage",
+    };
+
+    const submissionsWithNotification = submissions.map((submission) => {
+      const rawReviews = (reviewsBySubmission[submission.id] || []).map((r) => {
+        const earliest = new Date(
+          Math.min(r.created_at.getTime(), r.updated_at.getTime())
+        );
+        return { ...r, reviewer_user: pickSafeUserFields(r.reviewer_user), _sortTime: earliest };
+      });
+
+      rawReviews.sort((a, b) => a._sortTime.getTime() - b._sortTime.getTime());
+
+      const reviews = rawReviews.map(({ _sortTime, ...r }) => {
+        const hasNotif = notificationMap.has(r.id)
+          ? { hasNotification: true, notificationId: notificationMap.get(r.id) }
+          : { hasNotification: false, notificationId: null };
+        return { ...r, ...hasNotif };
+      });
+
+      const earliestSubmission = new Date(
+        Math.min(submission.created_at.getTime(), submission.updated_at.getTime())
+      );
+
+      const subNotif = notificationMap.has(submission.id)
+        ? { hasNotification: true, notificationId: notificationMap.get(submission.id) }
+        : { hasNotification: false, notificationId: null };
+
+      return {
+        ...submission,
+        ...subNotif,
+        reviews,
+        _sortTime: earliestSubmission,
+      };
+    });
+
+    submissionsWithNotification.sort((a, b) => a._sortTime.getTime() - b._sortTime.getTime());
+
+    const grouped: Record<string, any[]> = {
+      caseStudy: [],
+      designing: [],
+      rendering: [],
+      finalStage: [],
+    };
+
+    for (const item of submissionsWithNotification) {
+      const { _sortTime, ...rest } = item;
+      const stage = rest.stage;
+      const key = stageKeyMap[stage] || "caseStudy";
+      grouped[key].push(rest);
+    }
+
+    return {
+      taskId,
+      taskNotification: hasTaskNotification,
+      ...grouped,
+    };
+  }
+
   async pauseTask(taskId: string, reason: string, userId: string) {
     const task = await this.taskRepo.findOneBy({ id: taskId });
     if (!task) throw new AppError(404, "Designer task not found");
