@@ -4,7 +4,7 @@ import { AppDataSource } from "../config/data-source";
 import { User } from "../entities/User";
 import { UserRole } from "../enums/user-role.enum";
 import { AppError } from "../middlewares/error.middleware";
-import { pickSafeUserFields, SafeUserOutput } from "../utils/response.utils";
+import { pickSafeUserFields, pickCeoUserFields, SafeUserOutput, CeoUserOutput } from "../utils/response.utils";
 
 interface PaginatedResult<T> {
   data: T[];
@@ -59,7 +59,7 @@ export class UserService {
     role?: UserRole,
     is_active?: boolean,
     search?: string
-  ): Promise<PaginatedResult<SafeUserOutput>> {
+  ): Promise<PaginatedResult<CeoUserOutput>> {
     const p = Math.max(1, page);
     const l = Math.min(100, Math.max(1, limit));
     const where: FindOptionsWhere<User> = {};
@@ -90,7 +90,7 @@ export class UserService {
     });
 
     return {
-      data: users.map(sanitizeUser),
+      data: users.map((u) => pickCeoUserFields(u)!),
       meta: {
         total,
         page: p,
