@@ -9,6 +9,7 @@ import { LoginDto, ForgotPasswordDto, ResetPasswordDto } from "../validators/aut
 export class AuthController {
   async login(req: Request, res: Response): Promise<void> {
     try {
+      console.log("Login request body:", req.body);
       const dto = plainToInstance(LoginDto, req.body);
       const errors = await validate(dto);
       if (errors.length > 0) {

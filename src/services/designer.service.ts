@@ -190,7 +190,7 @@ export class DesignerService {
     }
 
     if (currentUser.role === UserRole.DESIGNER) {
-      qb.andWhere("t.is_public = TRUE");
+      qb.andWhere("t.assigned_to_user_id = :currentUserId", { currentUserId: currentUser.id });
       return;
     }
 
