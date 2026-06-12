@@ -18,3 +18,4 @@ export { QuantitySurveyorTask } from "./QuantitySurveyorTask";
 export { QuantitySurveyorSubmission } from "./QuantitySurveyorSubmission";
 export { QuantitySurveyorReview } from "./QuantitySurveyorReview";
 export { Notification } from "./Notification";
+export { PaidCustomerReview } from "./PaidCustomerReview";

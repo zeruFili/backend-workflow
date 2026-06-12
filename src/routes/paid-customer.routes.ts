@@ -59,10 +59,17 @@ router.patch(
 );
 
 router.post(
-  "/:id/verify",
+  "/:id/reviews",
   authenticate,
   authorize(UserRole.FINANCE, UserRole.CEO),
-  (req, res, next) => ctrl.verify(req as any, res, next)
+  (req, res, next) => ctrl.reviewByPaidCustomerId(req as any, res, next)
+);
+
+router.get(
+  "/:id/submissions-with-reviews",
+  authenticate,
+  authorize(UserRole.CEO, UserRole.GENERAL_MANAGER, UserRole.MARKETING, UserRole.FINANCE),
+  (req, res, next) => ctrl.getSubmissionsWithReviews(req as any, res, next)
 );
 
 router.get(

@@ -4,7 +4,7 @@ import { plainToInstance } from "class-transformer";
 import { AuthRequest } from "../middlewares/auth.middleware";
 import { AppError } from "../middlewares/error.middleware";
 import { paidCustomerService } from "../services/paid-customer.service";
-import { CreatePaidCustomerDto, VerifyPaidCustomerDto, UpdatePaidCustomerDto } from "../validators/paid-customer.dto";
+import { CreatePaidCustomerDto, UpdatePaidCustomerDto, CreatePaidCustomerReviewDto } from "../validators/paid-customer.dto";
 import { getFilePathsFromRequest, cleanupUploadedFiles } from "../utils/upload.utils";
 
 async function validateDto<T extends object>(dtoClass: new () => T, plain: object, req: AuthRequest): Promise<T> {
@@ -169,29 +169,72 @@ export class PaidCustomerController {
     }
   }
 
-  async verify(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+  async getVerificationHistory(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
       const id = req.params.id as string;
-      const dto = await validateDto(VerifyPaidCustomerDto, req.body, req);
+
+      const result = await paidCustomerService.getVerificationHistory(id);
+      res.status(200).json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async reviewByPaidCustomerId(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const paidCustomerId = req.params.id as string;
+      const dto = await validateDto(CreatePaidCustomerReviewDto, req.body, req);
 
       if (!req.user) {
         res.status(401).json({ success: false, message: "Unauthorized" });
         return;
       }
 
-      const result = await paidCustomerService.verify(id, dto, req.user.id);
+      const result = await paidCustomerService.reviewByPaidCustomerId(paidCustomerId, dto, req.user.id);
 
-      res.status(200).json({ success: true, data: result, message: `Payment ${dto.review_outcome}` });
+      res.status(201).json({ success: true, data: result, message: `Review ${dto.review_outcome}` });
     } catch (error) {
       next(error);
     }
   }
 
-  async getVerificationHistory(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+  async reviewBySubmissionId(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
-      const id = req.params.id as string;
+      const submissionId = req.params.id as string;
+      const dto = await validateDto(CreatePaidCustomerReviewDto, req.body, req);
 
-      const result = await paidCustomerService.getVerificationHistory(id);
+      if (!req.user) {
+        res.status(401).json({ success: false, message: "Unauthorized" });
+        return;
+      }
+
+      const result = await paidCustomerService.reviewBySubmissionId(submissionId, dto, req.user.id);
+
+      res.status(201).json({ success: true, data: result, message: `Review ${dto.review_outcome}` });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getSubmissionReviews(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const submissionId = req.params.id as string;
+      const reviews = await paidCustomerService.getSubmissionReviews(submissionId);
+      res.status(200).json({ success: true, data: reviews });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getSubmissionsWithReviews(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      if (!req.user) {
+        res.status(401).json({ success: false, message: "Unauthorized" });
+        return;
+      }
+
+      const paidCustomerId = req.params.id as string;
+      const result = await paidCustomerService.getSubmissionsWithReviews(paidCustomerId, req.user.id);
       res.status(200).json({ success: true, data: result });
     } catch (error) {
       next(error);

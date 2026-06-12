@@ -26,7 +26,7 @@ export class UpdatePaidCustomerDto {
   attachment_urls?: string[];
 }
 
-export class VerifyPaidCustomerDto {
+export class CreatePaidCustomerReviewDto {
   @IsEnum([ReviewOutcome.APPROVED, ReviewOutcome.REJECTED, ReviewOutcome.FEEDBACK])
   review_outcome: ReviewOutcome;
 
