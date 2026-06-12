@@ -6,15 +6,13 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
+import { DataSource } from "typeorm";
 import { AppDataSource } from "./config/data-source";
 import { errorHandler, notFound } from "./middlewares/error.middleware";
 
 import authRoutes from "./routes/auth.routes";
 import userRoutes from "./routes/user.routes";
-import customerRoutes from "./routes/customer.routes";
-import paidCustomerRoutes from "./routes/paid-customer.routes";
-import paidCustomerSubmissionRoutes from "./routes/paid-customer-submission.routes";
-import allCustomerRequestsRoutes from "./routes/all-customer-requests.routes";
+import marketingRoutes from "./routes/marketing.routes";
 import qsRoutes from "./routes/qs.routes";
 import notificationRoutes from "./routes/notification.routes";
 import dataCollectorRoutes from "./routes/data-collector.routes";
@@ -33,10 +31,7 @@ app.use("/uploads", express.static(path.join(__dirname, "..", "uploads")));
 
 app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/users", userRoutes);
-app.use("/api/v1/customer-requests", customerRoutes);
-app.use("/api/v1/all-customer-requests", allCustomerRequestsRoutes);
-app.use("/api/v1/paid-customers", paidCustomerRoutes);
-app.use("/api/v1/paid-customer-submissions", paidCustomerSubmissionRoutes);
+app.use("/api/v1", marketingRoutes);
 app.use("/api/v1", ceoTransferRoutes);
 app.use("/api/v1", qsRoutes);
 app.use("/api/v1", notificationRoutes);
@@ -47,7 +42,40 @@ app.use("/api/v1/files", fileRoutes);
 app.use(notFound);
 app.use(errorHandler);
 
-AppDataSource.initialize()
+async function cleanupOldMarketingTables() {
+  const cleanupDs = new DataSource({
+    type: "postgres",
+    host: process.env.DB_HOST || "localhost",
+    port: Number(process.env.DB_PORT) || 5432,
+    username: process.env.DB_USER || "postgres",
+    password: process.env.DB_PASSWORD || "postgres",
+    database: process.env.DB_NAME || "wase_workflow",
+    synchronize: false,
+    logging: false,
+  });
+
+  try {
+    await cleanupDs.initialize();
+    await cleanupDs.query(`
+      DELETE FROM notification
+      WHERE parent_type IN ('paid_customer_submission', 'customer')
+         OR resource_type IN ('payment_submitted', 'clarification_requested', 'clarification_response')
+    `);
+    await cleanupDs.query(`DROP TABLE IF EXISTS paid_customer_review CASCADE`);
+    await cleanupDs.query(`DROP TABLE IF EXISTS marketing_review CASCADE`);
+    await cleanupDs.query(`DROP TABLE IF EXISTS marketing_submission CASCADE`);
+    await cleanupDs.query(`DROP TABLE IF EXISTS paid_customer CASCADE`);
+    await cleanupDs.query(`DROP TABLE IF EXISTS customer CASCADE`);
+    console.log("Marketing module data reset complete");
+  } catch (e: any) {
+    console.log("Marketing cleanup (non-fatal):", e.message);
+  } finally {
+    await cleanupDs.destroy();
+  }
+}
+
+cleanupOldMarketingTables()
+  .then(() => AppDataSource.initialize())
   .then(() => {
     console.log("Database connected successfully");
     app.listen(PORT, () => {

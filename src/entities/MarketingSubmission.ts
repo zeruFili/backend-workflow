@@ -2,20 +2,20 @@ import {
   Entity, PrimaryGeneratedColumn, Column, CreateDateColumn,
   ManyToOne, JoinColumn, Index,
 } from "typeorm";
-import { PaidCustomer } from "./PaidCustomer";
+import { MarketingTask } from "./MarketingTask";
 
 @Entity("marketing_submission")
-@Index("idx_marketing_submission_paid_customer_created_at", ["paid_customer_id", "created_at"])
+@Index("idx_marketing_submission_task_id", ["marketing_task_id"])
 export class MarketingSubmission {
   @PrimaryGeneratedColumn("uuid")
   id: string;
 
   @Column({ type: "uuid" })
-  paid_customer_id: string;
+  marketing_task_id: string;
 
-  @ManyToOne(() => PaidCustomer, { onDelete: "CASCADE" })
-  @JoinColumn({ name: "paid_customer_id" })
-  paid_customer: PaidCustomer;
+  @ManyToOne(() => MarketingTask)
+  @JoinColumn({ name: "marketing_task_id" })
+  marketing_task: MarketingTask;
 
   @Column({ type: "text" })
   description: string;

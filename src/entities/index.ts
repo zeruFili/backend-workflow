@@ -1,8 +1,4 @@
 export { User } from "./User";
-export { Customer } from "./Customer";
-export { PaidCustomer } from "./PaidCustomer";
-export { MarketingSubmission } from "./MarketingSubmission";
-export { MarketingReview } from "./MarketingReview";
 export { CeoTransfer } from "./CeoTransfer";
 export { DataCollectorTask } from "./DataCollectorTask";
 export { DataCollectorSubmission } from "./DataCollectorSubmission";
@@ -17,5 +13,7 @@ export { PausedTask } from "./PausedTask";
 export { QuantitySurveyorTask } from "./QuantitySurveyorTask";
 export { QuantitySurveyorSubmission } from "./QuantitySurveyorSubmission";
 export { QuantitySurveyorReview } from "./QuantitySurveyorReview";
+export { MarketingTask } from "./MarketingTask";
+export { MarketingSubmission } from "./MarketingSubmission";
+export { MarketingReview } from "./MarketingReview";
 export { Notification } from "./Notification";
-export { PaidCustomerReview } from "./PaidCustomerReview";

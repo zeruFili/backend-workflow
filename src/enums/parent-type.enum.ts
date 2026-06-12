@@ -3,5 +3,4 @@ export enum ParentType {
   DESIGNER_TASK = "designer_task",
   QUANTITY_SURVEYOR_TASK = "quantity_surveyor_task",
   MARKETING_TASK = "marketing_task",
-  PAID_CUSTOMER_SUBMISSION = "paid_customer_submission",
 }

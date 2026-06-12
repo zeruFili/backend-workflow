@@ -2,12 +2,13 @@ import {
   Entity, PrimaryGeneratedColumn, Column, CreateDateColumn,
   ManyToOne, JoinColumn, Index,
 } from "typeorm";
-import { User } from "./User";
 import { MarketingSubmission } from "./MarketingSubmission";
+import { User } from "./User";
 import { ReviewOutcome } from "../enums/review-outcome.enum";
 
 @Entity("marketing_review")
 @Index("idx_marketing_review_submission_id", ["marketing_submission_id"])
+@Index("idx_marketing_review_reviewer_user_id", ["reviewer_user_id"])
 export class MarketingReview {
   @PrimaryGeneratedColumn("uuid")
   id: string;
@@ -15,7 +16,7 @@ export class MarketingReview {
   @Column({ type: "uuid" })
   marketing_submission_id: string;
 
-  @ManyToOne(() => MarketingSubmission, { onDelete: "CASCADE" })
+  @ManyToOne(() => MarketingSubmission)
   @JoinColumn({ name: "marketing_submission_id" })
   marketing_submission: MarketingSubmission;
 
@@ -24,7 +25,7 @@ export class MarketingReview {
 
   @ManyToOne(() => User)
   @JoinColumn({ name: "reviewer_user_id" })
-  reviewer: User;
+  reviewer_user: User;
 
   @Column({ type: "text" })
   description: string;

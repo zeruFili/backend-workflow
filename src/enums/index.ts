@@ -6,4 +6,3 @@ export { ResourceType } from "./resource-type.enum";
 export { ParentType } from "./parent-type.enum";
 export { DataCollectorTaskStatus } from "./data-collector-task-status.enum";
 export { SubmissionReviewStatus } from "./submission-review-status.enum";
-export { CustomerRequestStatus } from "./customer-request-status.enum";
