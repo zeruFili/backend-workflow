@@ -227,6 +227,21 @@ export class DesignerService {
     const taskIds = data.map((t) => t.id);
     const submissionsByTask = await this.batchSubmissionsWithReviews(taskIds, currentUser.id);
 
+    // Sort by latest activity (task, submission, or review timestamps) descending
+    data.sort((a, b) => {
+      const aTs = Math.max(
+        a.created_at.getTime(),
+        a.updated_at?.getTime() ?? 0,
+        submissionsByTask[a.id]?.latestActivityTs ?? 0
+      );
+      const bTs = Math.max(
+        b.created_at.getTime(),
+        b.updated_at?.getTime() ?? 0,
+        submissionsByTask[b.id]?.latestActivityTs ?? 0
+      );
+      return bTs - aTs;
+    });
+
     return {
       success: true,
       data: data.map((task) => {
@@ -376,6 +391,17 @@ export class DesignerService {
         designing: grouped.designing,
         rendering: grouped.rendering,
         finalStage: grouped.finalStage,
+        latestActivityTs: Math.max(
+          ...taskSubmissions.flatMap((sub) => [
+            sub.created_at?.getTime() ?? 0,
+            sub.updated_at?.getTime() ?? 0,
+            ...(reviewsBySubmission[sub.id] || []).flatMap((r) => [
+              r.created_at?.getTime() ?? 0,
+              r.updated_at?.getTime() ?? 0,
+            ]),
+          ]),
+          0
+        ),
       };
     }
 
