@@ -41,7 +41,6 @@ router.patch(
   (req, res, next) => quantitySurveyorController.updateTask(req, res, next)
 );
 router.get("/qs-tasks/:id/submissions", authenticate, authorize(UserRole.CEO, UserRole.GENERAL_MANAGER, UserRole.QUANTITY_SURVEYOR), (req, res, next) => quantitySurveyorController.getSubmissions(req, res, next));
-router.get("/qs-tasks/:id/submissions-with-reviews", authenticate, authorize(UserRole.CEO, UserRole.GENERAL_MANAGER, UserRole.QUANTITY_SURVEYOR), (req, res, next) => quantitySurveyorController.getSubmissionsWithReviews(req, res, next));
 router.post(
   "/qs-tasks/:id/submissions",
   authenticate,

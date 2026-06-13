@@ -1,3 +1,4 @@
+import { In } from "typeorm";
 import { AppDataSource } from "../config/data-source";
 import { DesignerTask } from "../entities/DesignerTask";
 import { DesignerApplication } from "../entities/DesignerApplication";
@@ -223,11 +224,156 @@ export class DesignerService {
     const skip = (page - 1) * limit;
     const [data, total] = await qb.skip(skip).take(limit).getManyAndCount();
 
+    const taskIds = data.map((t) => t.id);
+    const submissionsByTask = await this.batchSubmissionsWithReviews(taskIds, currentUser.id);
+
     return {
       success: true,
-      data: data.map((task) => this.sanitizeDesignerTask(task)),
+      data: data.map((task) => {
+        const swr = submissionsByTask[task.id] || {
+          taskNotification: { hasNotification: false, notificationId: null },
+          caseStudy: [],
+          designing: [],
+          rendering: [],
+          finalStage: [],
+        };
+        return {
+          ...this.sanitizeDesignerTask(task),
+          submissionsWithReviews: swr,
+        };
+      }),
       meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
     };
+  }
+
+  private async batchSubmissionsWithReviews(taskIds: string[], userId: string): Promise<Record<string, any>> {
+    if (taskIds.length === 0) return {};
+
+    const submissions = await this.submissionRepo.find({
+      where: taskIds.map((id) => ({ designer_task_id: id } as any)),
+    });
+
+    const submissionIds = submissions.map((s) => s.id);
+
+    const allReviews = submissionIds.length > 0
+      ? await this.submissionReviewRepo.find({
+          where: submissionIds.map((id) => ({ designer_submission_id: id } as any)),
+          relations: ["reviewer_user"],
+        })
+      : [];
+
+    const reviewsBySubmission: Record<string, DesignerSubmissionReview[]> = {};
+    for (const r of allReviews) {
+      if (!reviewsBySubmission[r.designer_submission_id]) {
+        reviewsBySubmission[r.designer_submission_id] = [];
+      }
+      reviewsBySubmission[r.designer_submission_id].push(r);
+    }
+
+    const unreadNotifications = await this.notificationRepo.find({
+      where: {
+        user_id: userId,
+        parent_id: In(taskIds) as any,
+        viewed: false,
+      },
+    });
+
+    const notificationMap = new Map<string, string>();
+    for (const n of unreadNotifications) {
+      if (!notificationMap.has(n.resource_id)) {
+        notificationMap.set(n.resource_id, n.id);
+      }
+    }
+
+    const submissionsByTask: Record<string, DesignerSubmission[]> = {};
+    for (const s of submissions) {
+      if (!submissionsByTask[s.designer_task_id]) {
+        submissionsByTask[s.designer_task_id] = [];
+      }
+      submissionsByTask[s.designer_task_id].push(s);
+    }
+
+    const stageKeyMap: Record<string, string> = {
+      [DesignerStage.CASE_STUDY]: "caseStudy",
+      [DesignerStage.DESIGNING]: "designing",
+      [DesignerStage.RENDERING]: "rendering",
+      [DesignerStage.FINAL_STAGE]: "finalStage",
+    };
+
+    const result: Record<string, any> = {};
+
+    for (const taskId of taskIds) {
+      const taskSubmissions = submissionsByTask[taskId] || [];
+
+      const hasTaskNotification = notificationMap.has(taskId)
+        ? { hasNotification: true, notificationId: notificationMap.get(taskId) }
+        : { hasNotification: false, notificationId: null };
+
+      const submissionsWithNotification = taskSubmissions.map((submission) => {
+        const rawReviews = (reviewsBySubmission[submission.id] || []).map((r) => {
+          const earliest = new Date(
+            Math.min(
+              r.created_at?.getTime() ?? r.updated_at?.getTime() ?? 0,
+              r.updated_at?.getTime() ?? r.created_at?.getTime() ?? 0
+            )
+          );
+          return { ...r, reviewer_user: pickSafeUserFields(r.reviewer_user), _sortTime: earliest };
+        });
+
+        rawReviews.sort((a, b) => a._sortTime.getTime() - b._sortTime.getTime());
+
+        const reviews = rawReviews.map(({ _sortTime, ...r }) => {
+          const hasNotif = notificationMap.has(r.id)
+            ? { hasNotification: true, notificationId: notificationMap.get(r.id) }
+            : { hasNotification: false, notificationId: null };
+          return { ...r, ...hasNotif };
+        });
+
+        const earliestSubmission = new Date(
+          Math.min(
+            submission.created_at?.getTime() ?? submission.updated_at?.getTime() ?? 0,
+            submission.updated_at?.getTime() ?? submission.created_at?.getTime() ?? 0
+          )
+        );
+
+        const subNotif = notificationMap.has(submission.id)
+          ? { hasNotification: true, notificationId: notificationMap.get(submission.id) }
+          : { hasNotification: false, notificationId: null };
+
+        return {
+          ...submission,
+          ...subNotif,
+          reviews,
+          _sortTime: earliestSubmission,
+        };
+      });
+
+      submissionsWithNotification.sort((a, b) => a._sortTime.getTime() - b._sortTime.getTime());
+
+      const grouped: Record<string, any[]> = {
+        caseStudy: [],
+        designing: [],
+        rendering: [],
+        finalStage: [],
+      };
+
+      for (const item of submissionsWithNotification) {
+        const { _sortTime, ...rest } = item;
+        const stage = rest.stage;
+        const key = stageKeyMap[stage] || "caseStudy";
+        grouped[key].push(rest);
+      }
+
+      result[taskId] = {
+        taskNotification: hasTaskNotification,
+        caseStudy: grouped.caseStudy,
+        designing: grouped.designing,
+        rendering: grouped.rendering,
+        finalStage: grouped.finalStage,
+      };
+    }
+
+    return result;
   }
 
   async findTaskById(id: string, currentUser?: { id: string; role: UserRole }) {
@@ -899,117 +1045,6 @@ export class DesignerService {
       ...r,
       reviewer_user: pickSafeUserFields(r.reviewer_user),
     }));
-  }
-
-  async getSubmissionsWithReviews(taskId: string, userId: string) {
-    const task = await this.taskRepo.findOneBy({ id: taskId });
-    if (!task) throw new AppError(404, "Designer task not found");
-
-    const submissions = await this.submissionRepo.find({
-      where: { designer_task_id: taskId },
-    });
-
-    const allReviews = submissions.length > 0
-      ? await this.submissionReviewRepo.find({
-          where: submissions.map((s) => ({ designer_submission_id: s.id } as any)),
-          relations: ["reviewer_user"],
-        })
-      : [];
-
-    const reviewsBySubmission: Record<string, DesignerSubmissionReview[]> = {};
-    for (const r of allReviews) {
-      if (!reviewsBySubmission[r.designer_submission_id]) {
-        reviewsBySubmission[r.designer_submission_id] = [];
-      }
-      reviewsBySubmission[r.designer_submission_id].push(r);
-    }
-
-    const unreadNotifications = await this.notificationRepo.find({
-      where: {
-        user_id: userId,
-        parent_id: taskId,
-        viewed: false,
-      },
-    });
-
-    const notificationMap = new Map<string, string>();
-    for (const n of unreadNotifications) {
-      if (!notificationMap.has(n.resource_id)) {
-        notificationMap.set(n.resource_id, n.id);
-      }
-    }
-
-    const hasTaskNotification = notificationMap.has(taskId)
-      ? { hasNotification: true, notificationId: notificationMap.get(taskId) }
-      : { hasNotification: false, notificationId: null };
-
-    const stageKeyMap: Record<string, string> = {
-      [DesignerStage.CASE_STUDY]: "caseStudy",
-      [DesignerStage.DESIGNING]: "designing",
-      [DesignerStage.RENDERING]: "rendering",
-      [DesignerStage.FINAL_STAGE]: "finalStage",
-    };
-
-    const submissionsWithNotification = submissions.map((submission) => {
-      const rawReviews = (reviewsBySubmission[submission.id] || []).map((r) => {
-        const earliest = new Date(
-          Math.min(
-            r.created_at?.getTime() ?? r.updated_at?.getTime() ?? 0,
-            r.updated_at?.getTime() ?? r.created_at?.getTime() ?? 0
-          )
-        );
-        return { ...r, reviewer_user: pickSafeUserFields(r.reviewer_user), _sortTime: earliest };
-      });
-
-      rawReviews.sort((a, b) => a._sortTime.getTime() - b._sortTime.getTime());
-
-      const reviews = rawReviews.map(({ _sortTime, ...r }) => {
-        const hasNotif = notificationMap.has(r.id)
-          ? { hasNotification: true, notificationId: notificationMap.get(r.id) }
-          : { hasNotification: false, notificationId: null };
-        return { ...r, ...hasNotif };
-      });
-
-      const earliestSubmission = new Date(
-        Math.min(
-          submission.created_at?.getTime() ?? submission.updated_at?.getTime() ?? 0,
-          submission.updated_at?.getTime() ?? submission.created_at?.getTime() ?? 0
-        )
-      );
-
-      const subNotif = notificationMap.has(submission.id)
-        ? { hasNotification: true, notificationId: notificationMap.get(submission.id) }
-        : { hasNotification: false, notificationId: null };
-
-      return {
-        ...submission,
-        ...subNotif,
-        reviews,
-        _sortTime: earliestSubmission,
-      };
-    });
-
-    submissionsWithNotification.sort((a, b) => a._sortTime.getTime() - b._sortTime.getTime());
-
-    const grouped: Record<string, any[]> = {
-      caseStudy: [],
-      designing: [],
-      rendering: [],
-      finalStage: [],
-    };
-
-    for (const item of submissionsWithNotification) {
-      const { _sortTime, ...rest } = item;
-      const stage = rest.stage;
-      const key = stageKeyMap[stage] || "caseStudy";
-      grouped[key].push(rest);
-    }
-
-    return {
-      taskId,
-      taskNotification: hasTaskNotification,
-      ...grouped,
-    };
   }
 
   async pauseTask(taskId: string, reason: string, userId: string) {

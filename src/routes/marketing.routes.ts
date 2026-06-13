@@ -72,13 +72,6 @@ router.patch(
 );
 
 router.get(
-  "/marketing-tasks/:id/submissions-with-reviews",
-  authenticate,
-  authorize(UserRole.CEO, UserRole.FINANCE, UserRole.MARKETING),
-  (req, res, next) => marketingController.getSubmissionsWithReviews(req as any, res, next)
-);
-
-router.get(
   "/marketing-submissions/:id/reviews",
   authenticate,
   authorize(UserRole.CEO, UserRole.FINANCE, UserRole.MARKETING),

@@ -138,11 +138,121 @@ export class MarketingService {
     const skip = (page - 1) * limit;
     const [data, total] = await qb.skip(skip).take(limit).getManyAndCount();
 
+    const taskIds = data.map((t) => t.id);
+    const submissionsByTask = await this.batchSubmissionsWithReviews(taskIds, currentUser.id);
+
     return {
       success: true,
-      data: data.map((task) => this.sanitizeTask(task)),
+      data: data.map((task) => ({
+        ...this.sanitizeTask(task),
+        submissionsWithReviews: submissionsByTask[task.id] || { submissions: [] },
+      })),
       meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
     };
+  }
+
+  private async batchSubmissionsWithReviews(taskIds: string[], userId: string): Promise<Record<string, any>> {
+    if (taskIds.length === 0) return {};
+
+    const submissions = await this.submissionRepo.find({
+      where: taskIds.map((id) => ({ marketing_task_id: id } as any)),
+    });
+
+    const allReviews = submissions.length > 0
+      ? await this.reviewRepo.find({
+          where: submissions.map((s) => ({ marketing_submission_id: s.id } as any)),
+          relations: ["reviewer_user"],
+        })
+      : [];
+
+    const reviewsBySubmission: Record<string, MarketingReview[]> = {};
+    for (const r of allReviews) {
+      if (!reviewsBySubmission[r.marketing_submission_id]) {
+        reviewsBySubmission[r.marketing_submission_id] = [];
+      }
+      reviewsBySubmission[r.marketing_submission_id].push(r);
+    }
+
+    const relevantResourceIds = [...taskIds, ...submissions.map((s) => s.id)];
+    if (allReviews.length > 0) {
+      relevantResourceIds.push(...allReviews.map((r) => r.id));
+    }
+
+    const unreadNotifications = await this.notificationRepo.find({
+      where: {
+        user_id: userId,
+        resource_id: In(relevantResourceIds),
+        viewed: false,
+      },
+    });
+
+    const notificationMap = new Map<string, string>();
+    for (const n of unreadNotifications) {
+      if (!notificationMap.has(n.resource_id)) {
+        notificationMap.set(n.resource_id, n.id);
+      }
+    }
+
+    const submissionsByTask: Record<string, MarketingSubmission[]> = {};
+    for (const s of submissions) {
+      if (!submissionsByTask[s.marketing_task_id]) {
+        submissionsByTask[s.marketing_task_id] = [];
+      }
+      submissionsByTask[s.marketing_task_id].push(s);
+    }
+
+    const result: Record<string, any> = {};
+
+    for (const taskId of taskIds) {
+      const taskSubmissions = submissionsByTask[taskId] || [];
+
+      const submissionsWithReviews = taskSubmissions.map((submission) => {
+        const rawReviews = (reviewsBySubmission[submission.id] || []).map((r) => {
+          const earliest = new Date(
+            Math.min(
+              r.created_at?.getTime() ?? r.updated_at?.getTime() ?? 0,
+              r.updated_at?.getTime() ?? r.created_at?.getTime() ?? 0
+            )
+          );
+          return { ...r, reviewer_user: pickSafeUserFields(r.reviewer_user), _sortTime: earliest };
+        });
+
+        rawReviews.sort((a, b) => a._sortTime.getTime() - b._sortTime.getTime());
+
+        const reviews = rawReviews.map(({ _sortTime, ...r }) => {
+          const hasNotif = notificationMap.has(r.id)
+            ? { hasNotification: true, notificationId: notificationMap.get(r.id) }
+            : { hasNotification: false, notificationId: null };
+          return { ...r, ...hasNotif };
+        });
+
+        const earliestSubmission = new Date(
+          Math.min(
+            submission.created_at?.getTime() ?? submission.updated_at?.getTime() ?? 0,
+            submission.updated_at?.getTime() ?? submission.created_at?.getTime() ?? 0
+          )
+        );
+
+        const subNotif = notificationMap.has(submission.id)
+          ? { hasNotification: true, notificationId: notificationMap.get(submission.id) }
+          : { hasNotification: false, notificationId: null };
+
+        return {
+          ...submission,
+          ...subNotif,
+          reviews,
+          _sortTime: earliestSubmission,
+        };
+      });
+
+      submissionsWithReviews.sort((a, b) => a._sortTime.getTime() - b._sortTime.getTime());
+
+      result[taskId] = {
+        submissions: submissionsWithReviews.map(({ _sortTime, ...rest }) => rest),
+      };
+    }
+
+    return result;
   }
 
   async findTaskById(id: string, currentUser?: { id: string; role: UserRole }) {
@@ -517,96 +627,6 @@ export class MarketingService {
       ...r,
       reviewer_user: pickSafeUserFields(r.reviewer_user),
     }));
-  }
-
-  async getSubmissionsWithReviews(taskId: string, userId: string) {
-    const task = await this.taskRepo.findOneBy({ id: taskId });
-    if (!task) throw new AppError(404, "Marketing task not found");
-
-    const submissions = await this.submissionRepo.find({
-      where: { marketing_task_id: taskId },
-    });
-
-    const allReviews = submissions.length > 0
-      ? await this.reviewRepo.find({
-          where: submissions.map((s) => ({ marketing_submission_id: s.id } as any)),
-          relations: ["reviewer_user"],
-        })
-      : [];
-
-    const reviewsBySubmission: Record<string, MarketingReview[]> = {};
-    for (const r of allReviews) {
-      if (!reviewsBySubmission[r.marketing_submission_id]) {
-        reviewsBySubmission[r.marketing_submission_id] = [];
-      }
-      reviewsBySubmission[r.marketing_submission_id].push(r);
-    }
-
-    const relevantResourceIds = [taskId, ...submissions.map((s) => s.id)];
-    if (allReviews.length > 0) {
-      relevantResourceIds.push(...allReviews.map((r) => r.id));
-    }
-
-    const unreadNotifications = await this.notificationRepo.find({
-      where: {
-        user_id: userId,
-        resource_id: In(relevantResourceIds),
-        viewed: false,
-      },
-    });
-
-    const notificationMap = new Map<string, string>();
-    for (const n of unreadNotifications) {
-      if (!notificationMap.has(n.resource_id)) {
-        notificationMap.set(n.resource_id, n.id);
-      }
-    }
-
-    const submissionsWithReviews = submissions.map((submission) => {
-      const rawReviews = (reviewsBySubmission[submission.id] || []).map((r) => {
-        const earliest = new Date(
-          Math.min(
-            r.created_at?.getTime() ?? r.updated_at?.getTime() ?? 0,
-            r.updated_at?.getTime() ?? r.created_at?.getTime() ?? 0
-          )
-        );
-        return { ...r, reviewer_user: pickSafeUserFields(r.reviewer_user), _sortTime: earliest };
-      });
-
-      rawReviews.sort((a, b) => a._sortTime.getTime() - b._sortTime.getTime());
-
-      const reviews = rawReviews.map(({ _sortTime, ...r }) => {
-        const hasNotif = notificationMap.has(r.id)
-          ? { hasNotification: true, notificationId: notificationMap.get(r.id) }
-          : { hasNotification: false, notificationId: null };
-        return { ...r, ...hasNotif };
-      });
-
-      const earliestSubmission = new Date(
-        Math.min(
-          submission.created_at?.getTime() ?? submission.updated_at?.getTime() ?? 0,
-          submission.updated_at?.getTime() ?? submission.created_at?.getTime() ?? 0
-        )
-      );
-
-      const subNotif = notificationMap.has(submission.id)
-        ? { hasNotification: true, notificationId: notificationMap.get(submission.id) }
-        : { hasNotification: false, notificationId: null };
-
-      return {
-        ...submission,
-        ...subNotif,
-        reviews,
-        _sortTime: earliestSubmission,
-      };
-    });
-
-    submissionsWithReviews.sort((a, b) => a._sortTime.getTime() - b._sortTime.getTime());
-
-    return {
-      customerRequestId: taskId,
-      submissions: submissionsWithReviews.map(({ _sortTime, ...rest }) => rest),
-    };
   }
 }
 
