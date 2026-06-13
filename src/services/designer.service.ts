@@ -237,9 +237,15 @@ export class DesignerService {
           rendering: [],
           finalStage: [],
         };
+        const hasNestedNotification =
+          swr.caseStudy?.some((s: any) => s.hasNotification || (s.reviews || []).some((r: any) => r.hasNotification)) ||
+          swr.designing?.some((s: any) => s.hasNotification || (s.reviews || []).some((r: any) => r.hasNotification)) ||
+          swr.rendering?.some((s: any) => s.hasNotification || (s.reviews || []).some((r: any) => r.hasNotification)) ||
+          swr.finalStage?.some((s: any) => s.hasNotification || (s.reviews || []).some((r: any) => r.hasNotification));
         return {
           ...this.sanitizeDesignerTask(task),
           submissionsWithReviews: swr,
+          hasNestedNotification,
         };
       }),
       meta: { total, page, limit, totalPages: Math.ceil(total / limit) },

@@ -158,13 +158,20 @@ export class QuantitySurveyorService {
 
     return {
       success: true,
-      data: data.map((task) => ({
-        ...this.sanitizeTask(task),
-        submissionsWithReviews: submissionsByTask[task.id] || {
+      data: data.map((task) => {
+        const swr = submissionsByTask[task.id] || {
           taskNotification: { hasNotification: false, notificationId: null },
           submissions: [],
-        },
-      })),
+        };
+        const hasNestedNotification = (swr.submissions || []).some(
+          (s: any) => s.hasNotification || (s.submission?.reviews || []).some((r: any) => r.hasNotification)
+        );
+        return {
+          ...this.sanitizeTask(task),
+          submissionsWithReviews: swr,
+          hasNestedNotification,
+        };
+      }),
       meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
     };
   }
