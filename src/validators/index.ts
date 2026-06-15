@@ -5,3 +5,4 @@ export { CreateDesignerTaskDto, UpdateDesignerTaskDto, AssignDesignerDto, Create
 export { CreateQSTaskDto, UpdateQSTaskDto, CreateQSSubmissionDto, CreateQSReviewDto, UpdateQSReviewDto } from "./qs.dto";
 export { CreateMarketingTaskDto, UpdateMarketingTaskDto, CreateMarketingSubmissionDto, CreateMarketingReviewDto, UpdateMarketingReviewDto } from "./marketing.dto";
 export { CreateCeoTransferDto, UpdateCeoTransferDto } from "./ceo-transfer.dto";
+export { BulkMarkReadDto } from "./notification.dto";

@@ -2,6 +2,8 @@ import { Response } from "express";
 import { AuthRequest } from "../middlewares/auth.middleware";
 import { notificationService } from "../services/notification.service";
 import { AppError } from "../middlewares/error.middleware";
+import { BulkMarkReadDto } from "../validators/notification.dto";
+import { validate } from "class-validator";
 
 export class NotificationController {
   async getUserNotifications(req: AuthRequest, res: Response): Promise<void> {
@@ -49,6 +51,29 @@ export class NotificationController {
         return;
       }
       console.error("markRead error:", err);
+      res.status(500).json({ success: false, message: "Internal server error" });
+    }
+  }
+
+  async markMultipleRead(req: AuthRequest, res: Response): Promise<void> {
+    try {
+      const dto = new BulkMarkReadDto();
+      dto.ids = req.body.ids;
+      const errors = await validate(dto);
+      if (errors.length > 0) {
+        res.status(400).json({ success: false, message: "Validation failed", errors });
+        return;
+      }
+
+      const userId = req.user!.id;
+      const result = await notificationService.markMultipleRead(dto.ids, userId);
+      res.json({ success: true, ...result });
+    } catch (err) {
+      if (err instanceof AppError) {
+        res.status(err.statusCode).json({ success: false, message: err.message });
+        return;
+      }
+      console.error("markMultipleRead error:", err);
       res.status(500).json({ success: false, message: "Internal server error" });
     }
   }

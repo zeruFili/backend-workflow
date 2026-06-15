@@ -74,6 +74,26 @@ export class NotificationService {
     return this.repo.save(notification);
   }
 
+  async markMultipleRead(ids: string[], userId: string) {
+    const notifications = await this.repo
+      .createQueryBuilder("n")
+      .where("n.id IN (:...ids)", { ids })
+      .andWhere("n.user_id = :userId", { userId })
+      .andWhere("n.viewed = false")
+      .getMany();
+
+    for (const n of notifications) {
+      n.viewed = true;
+      n.updated_at = new Date();
+    }
+
+    if (notifications.length > 0) {
+      await this.repo.save(notifications);
+    }
+
+    return { markedCount: notifications.length, markedIds: notifications.map((n) => n.id) };
+  }
+
   async markAllRead(userId: string) {
     const notifications = await this.repo.find({
       where: { user_id: userId as any, viewed: false },
