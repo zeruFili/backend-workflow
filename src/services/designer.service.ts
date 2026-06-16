@@ -252,6 +252,7 @@ export class DesignerService {
           rendering: [],
           finalStage: [],
         };
+        const { taskNotification, ...restSwr } = swr;
         const hasNestedNotification =
           swr.caseStudy?.some((s: any) => s.hasNotification || (s.reviews || []).some((r: any) => r.hasNotification)) ||
           swr.designing?.some((s: any) => s.hasNotification || (s.reviews || []).some((r: any) => r.hasNotification)) ||
@@ -259,7 +260,8 @@ export class DesignerService {
           swr.finalStage?.some((s: any) => s.hasNotification || (s.reviews || []).some((r: any) => r.hasNotification));
         return {
           ...this.sanitizeDesignerTask(task),
-          submissionsWithReviews: swr,
+          taskNotification,
+          submissionsWithReviews: restSwr,
           hasNestedNotification,
         };
       }),

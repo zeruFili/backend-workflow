@@ -179,12 +179,14 @@ export class DataCollectorService {
           taskNotification: { hasNotification: false, notificationId: null },
           submissions: [],
         };
+        const { taskNotification, ...restSwr } = swr;
         const hasNestedNotification = (swr.submissions || []).some(
           (s: any) => s.hasNotification || (s.submission?.reviews || []).some((r: any) => r.hasNotification)
         );
         return {
           ...this.sanitizeTask(task),
-          submissionsWithReviews: swr,
+          taskNotification,
+          submissionsWithReviews: restSwr,
           hasNestedNotification,
         };
       }),
