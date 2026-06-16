@@ -57,7 +57,8 @@ export class DesignerController {
       const page = parseInt((req.query.page as string) || "1", 10);
       const limit = Math.min(100, parseInt((req.query.limit as string) || "20", 10));
       const status = req.query.status as string | undefined;
-      const assignedTo = req.query.assignedTo as string | undefined;
+      const assignedToRaw = req.query.assignedTo as string | undefined;
+      const assignedTo = assignedToRaw === '__unassigned__' ? null : (assignedToRaw as string | undefined);
       const isPublic = req.query.isPublic !== undefined ? req.query.isPublic === "true" : undefined;
       const isPaused = req.query.isPaused !== undefined ? req.query.isPaused === "true" : undefined;
       const search = req.query.search as string | undefined;

@@ -23,7 +23,7 @@ interface PaginatedParams {
   page: number;
   limit: number;
   status?: string;
-  assignedTo?: string;
+  assignedTo?: string | null;
   isPublic?: boolean;
   isPaused?: boolean;
   search?: string;
@@ -191,7 +191,10 @@ export class DesignerService {
     }
 
     if (currentUser.role === UserRole.DESIGNER) {
-      qb.andWhere("t.assigned_to_user_id = :currentUserId", { currentUserId: currentUser.id });
+      qb.andWhere(
+        "(t.assigned_to_user_id = :currentUserId OR (t.is_public = true AND t.assigned_to_user_id IS NULL))",
+        { currentUserId: currentUser.id }
+      );
       return;
     }
 
@@ -209,7 +212,11 @@ export class DesignerService {
     this.applyTaskListVisibilityScope(qb, currentUser);
 
     if (status) qb.andWhere("t.status = :status", { status });
-    if (assignedTo) qb.andWhere("t.assigned_to_user_id = :assignedTo", { assignedTo });
+    if (assignedTo === null) {
+      qb.andWhere("t.assigned_to_user_id IS NULL");
+    } else if (assignedTo) {
+      qb.andWhere("t.assigned_to_user_id = :assignedTo", { assignedTo });
+    }
     if (isPublic !== undefined) qb.andWhere("t.is_public = :isPublic", { isPublic });
     if (isPaused !== undefined) qb.andWhere("t.is_paused = :isPaused", { isPaused });
 
