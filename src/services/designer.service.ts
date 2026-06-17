@@ -550,8 +550,31 @@ export class DesignerService {
     const task = await this.taskRepo.findOneBy({ id: taskId });
     if (!task) throw new AppError(404, "Designer task not found");
 
-    if (task.assigned_to_user_id) {
-      throw new AppError(409, "Task is already assigned to a designer");
+    const isReassignment = !!task.assigned_to_user_id;
+
+    if (isReassignment) {
+      const submissionCount = await this.submissionRepo.count({
+        where: { designer_task_id: taskId },
+      });
+
+      if (submissionCount > 0) {
+        throw new AppError(
+          409,
+          "Cannot reassign: the assigned designer has already made submissions for this task."
+        );
+      }
+
+      const assignedAt = task.assigned_at;
+      if (assignedAt) {
+        const hoursSinceAssignment =
+          (Date.now() - assignedAt.getTime()) / (1000 * 60 * 60);
+        if (hoursSinceAssignment < 48) {
+          throw new AppError(
+            409,
+            "Cannot reassign yet: the current designer must have at least 2 days to make a submission before reassignment is allowed."
+          );
+        }
+      }
     }
 
     const designer = await this.userRepo.findOne({
@@ -560,6 +583,7 @@ export class DesignerService {
     if (!designer) throw new AppError(404, "Designer not found or not active");
 
     task.assigned_to_user_id = designerUserId as any;
+    task.assigned_at = new Date();
     task.updated_by = assignedByUserId as any;
     task.updated_at = new Date();
     await this.taskRepo.save(task);
