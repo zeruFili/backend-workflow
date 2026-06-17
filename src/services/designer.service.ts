@@ -844,6 +844,13 @@ export class DesignerService {
       );
     }
 
+    const existingReview = await this.submissionReviewRepo.findOneBy({
+      designer_submission_id: submissionId,
+    });
+    if (existingReview) {
+      throw new AppError(400, "A review already exists for this submission. Use the update endpoint to modify it.");
+    }
+
     task.status = reviewOutcome;
     task.updated_by = reviewerUserId as any;
     task.updated_at = new Date();
@@ -875,23 +882,29 @@ export class DesignerService {
   async updateSubmissionReview(
     reviewId: string,
     reviewerUserId: string,
+    submissionId: string,
+    taskId: string,
     params: { review_outcome?: ReviewOutcome; description?: string; task_state?: string }
   ) {
     const review = await this.submissionReviewRepo.findOne({
       where: { id: reviewId },
-      relations: ["designer_submission", "designer_submission.designer_task"],
     });
     if (!review) throw new AppError(404, "Designer submission review not found");
 
     if (review.reviewer_user_id !== reviewerUserId) {
-      throw new AppError(403, "You are not authorized to update this review. Only the user who originally created the review can modify it.");
+      throw new AppError(403, "You are not authorized to update this review.");
     }
 
-    const submission = review.designer_submission;
-    if (!submission) throw new AppError(404, "Associated submission not found");
+    const submission = await this.submissionRepo.findOne({
+      where: { id: submissionId, designer_task_id: taskId },
+    });
+    if (!submission) {
+      throw new AppError(404, "Submission not found for the given task");
+    }
 
-    const task = submission.designer_task;
-    if (!task) throw new AppError(404, "Associated designer task not found");
+    const task = await this.taskRepo.findOne({ where: { id: taskId } });
+    if (!task) throw new AppError(404, "Designer task not found");
+
     const effectiveTaskState = params.task_state || task.task_state;
     if (effectiveTaskState === TaskState.DEACTIVE) {
       throw new AppError(400, "Cannot update review for a deactivated task");
@@ -902,29 +915,30 @@ export class DesignerService {
       throw new AppError(400, "Reviews can only be updated within 24 hours of creation");
     }
 
-    const taskId = submission.designer_task_id;
-
     const latestSubmission = await this.submissionRepo.findOne({
       where: { designer_task_id: taskId },
       order: { created_at: "DESC" },
     });
 
-    if (latestSubmission && latestSubmission.id !== submission.id) {
-      throw new AppError(400, "Cannot update review: a newer submission exists for this task");
+    if (latestSubmission && latestSubmission.id !== submissionId) {
+      throw new AppError(400, "A newer submission exists for this task. Cannot update this review.");
     }
 
-    const otherReview = await this.submissionReviewRepo.findOneBy({
-      designer_submission_id: submission.id,
-    });
-    if (otherReview && otherReview.id !== reviewId) {
-      throw new AppError(400, "Another review already exists for this submission. This review cannot be edited.");
+    const newerReview = await this.submissionReviewRepo
+      .createQueryBuilder("sr")
+      .where("sr.designer_submission_id = :subId", { subId: review.designer_submission_id })
+      .andWhere("sr.id != :revId", { revId: reviewId })
+      .andWhere("sr.created_at > :reviewCreatedAt", { reviewCreatedAt: review.created_at })
+      .getOne();
+    if (newerReview) {
+      throw new AppError(400, "A newer review already exists for this submission. This review cannot be edited.");
     }
 
     if (params.review_outcome !== undefined) {
       review.review_outcome = params.review_outcome;
       task.status = params.review_outcome;
       task.updated_by = reviewerUserId as any;
-    task.updated_at = new Date();
+      task.updated_at = new Date();
       await this.taskRepo.save(task);
     }
 

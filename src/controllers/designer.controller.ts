@@ -101,6 +101,9 @@ export class DesignerController {
       if (bodyForValidation.story_point !== undefined) {
         bodyForValidation.story_point = parseInt(bodyForValidation.story_point as any, 10);
       }
+      if (bodyForValidation.is_public !== undefined) {
+        bodyForValidation.is_public = bodyForValidation.is_public === 'true' || bodyForValidation.is_public === true;
+      }
       const dto = await validateDto(CreateDesignerTaskDto, bodyForValidation, req);
 
       const filePaths = getFilePathsFromRequest(req, "designer_tasks");
@@ -293,10 +296,13 @@ export class DesignerController {
       }
 
       const reviewId = req.params.id as string;
+      console.log("Found review in the controller:", reviewId);
       const dto = await validateDto(UpdateSubmissionReviewDto, req.body, req);
       const review = await designerService.updateSubmissionReview(
         reviewId,
         req.user.id,
+        dto.submission_id,
+        dto.task_id,
         { review_outcome: dto.review_outcome, description: dto.description, task_state: dto.task_state }
       );
       res.status(200).json({ success: true, data: review, message: "Review updated successfully" });

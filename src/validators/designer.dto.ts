@@ -142,6 +142,14 @@ export class DesignApplicationDto {
 }
 
 export class UpdateSubmissionReviewDto {
+  @IsString()
+  @IsUUID()
+  submission_id: string;
+
+  @IsString()
+  @IsUUID()
+  task_id: string;
+
   @IsOptional()
   @IsEnum(ReviewOutcome)
   review_outcome?: ReviewOutcome;
