@@ -844,13 +844,6 @@ export class DesignerService {
       );
     }
 
-    const existingReview = await this.submissionReviewRepo.findOneBy({
-      designer_submission_id: submissionId,
-    });
-    if (existingReview) {
-      throw new AppError(400, "A review already exists for this submission. Use the update endpoint to modify it.");
-    }
-
     task.status = reviewOutcome;
     task.updated_by = reviewerUserId as any;
     task.updated_at = new Date();
