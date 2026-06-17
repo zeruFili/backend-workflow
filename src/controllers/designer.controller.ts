@@ -276,7 +276,8 @@ export class DesignerController {
         submissionId,
         req.user.id,
         dto.review_outcome,
-        dto.description
+        dto.description,
+        dto.task_state
       );
       res.status(201).json({ success: true, data: review, message: "Submission reviewed successfully" });
     } catch (error) {
@@ -296,7 +297,7 @@ export class DesignerController {
       const review = await designerService.updateSubmissionReview(
         reviewId,
         req.user.id,
-        { review_outcome: dto.review_outcome, description: dto.description }
+        { review_outcome: dto.review_outcome, description: dto.description, task_state: dto.task_state }
       );
       res.status(200).json({ success: true, data: review, message: "Review updated successfully" });
     } catch (error) {

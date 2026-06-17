@@ -197,7 +197,8 @@ export class DataCollectorController {
         submissionId,
         req.user.id,
         dto.review_outcome,
-        dto.description
+        dto.description,
+        dto.task_state
       );
       res.status(201).json({ success: true, data: review, message: "Review created successfully" });
     } catch (error) {
@@ -216,7 +217,7 @@ export class DataCollectorController {
       const dto = await validateDto(UpdateDCReviewDto, req.body, req);
       const review = await dataCollectorService.updateReview(
         reviewId,
-        { review_outcome: dto.review_outcome, description: dto.description },
+        { review_outcome: dto.review_outcome, description: dto.description, task_state: dto.task_state },
         req.user.id
       );
       res.status(200).json({ success: true, data: review, message: "Review updated successfully" });

@@ -99,6 +99,10 @@ export class CreateSubmissionReviewDto {
   @IsString()
   @Length(1, 5000)
   description: string;
+
+  @IsString()
+  @IsOptional()
+  task_state?: string;
 }
 
 export class CreateTaskReviewDto {
@@ -146,6 +150,10 @@ export class UpdateSubmissionReviewDto {
   @IsString()
   @Length(1, 5000)
   description?: string;
+
+  @IsOptional()
+  @IsString()
+  task_state?: string;
 }
 
 export class PauseTaskDto {

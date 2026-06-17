@@ -518,7 +518,8 @@ export class DataCollectorService {
     submissionId: string,
     reviewerUserId: string,
     reviewOutcome: ReviewOutcome,
-    description: string
+    description: string,
+    taskState?: string
   ) {
     const submission = await this.submissionRepo.findOne({
       where: { id: submissionId },
@@ -528,7 +529,8 @@ export class DataCollectorService {
 
     const task = submission.data_collector_task;
     if (!task) throw new AppError(404, "Associated data collector task not found");
-    if (task.task_state === TaskState.DEACTIVE) {
+    const effectiveTaskState = taskState || task.task_state;
+    if (effectiveTaskState === TaskState.DEACTIVE) {
       throw new AppError(400, "Cannot review a submission for a deactivated task");
     }
 
@@ -565,7 +567,7 @@ export class DataCollectorService {
 
   async updateReview(
     reviewId: string,
-    params: { review_outcome?: ReviewOutcome; description?: string },
+    params: { review_outcome?: ReviewOutcome; description?: string; task_state?: string },
     currentUserId: string
   ) {
     const review = await this.reviewRepo.findOne({
@@ -583,7 +585,8 @@ export class DataCollectorService {
 
     const task = submission.data_collector_task;
     if (!task) throw new AppError(404, "Associated data collector task not found");
-    if (task.task_state === TaskState.DEACTIVE) {
+    const effectiveTaskState = params.task_state || task.task_state;
+    if (effectiveTaskState === TaskState.DEACTIVE) {
       throw new AppError(400, "Cannot update review for a deactivated task");
     }
 

@@ -819,7 +819,8 @@ export class DesignerService {
     submissionId: string,
     reviewerUserId: string,
     reviewOutcome: ReviewOutcome,
-    description: string
+    description: string,
+    taskState?: string
   ) {
     const submission = await this.submissionRepo.findOne({
       where: { id: submissionId },
@@ -829,7 +830,7 @@ export class DesignerService {
 
     const task = submission.designer_task;
     if (!task) throw new AppError(404, "Associated designer task not found for this submission");
-    if (task.task_state === TaskState.DEACTIVE) {
+    if (taskState === TaskState.DEACTIVE || task.task_state === TaskState.DEACTIVE) {
       throw new AppError(400, "Cannot review a submission for a deactivated task");
     }
 
@@ -874,7 +875,7 @@ export class DesignerService {
   async updateSubmissionReview(
     reviewId: string,
     reviewerUserId: string,
-    params: { review_outcome?: ReviewOutcome; description?: string }
+    params: { review_outcome?: ReviewOutcome; description?: string; task_state?: string }
   ) {
     const review = await this.submissionReviewRepo.findOne({
       where: { id: reviewId },
@@ -891,7 +892,8 @@ export class DesignerService {
 
     const task = submission.designer_task;
     if (!task) throw new AppError(404, "Associated designer task not found");
-    if (task.task_state === TaskState.DEACTIVE) {
+    const effectiveTaskState = params.task_state || task.task_state;
+    if (effectiveTaskState === TaskState.DEACTIVE) {
       throw new AppError(400, "Cannot update review for a deactivated task");
     }
 
