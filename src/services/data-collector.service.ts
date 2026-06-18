@@ -363,6 +363,13 @@ export class DataCollectorService {
     const task = await this.taskRepo.findOneBy({ id });
     if (!task) throw new AppError(404, "Data collector task not found");
 
+    const existingSubmission = await this.submissionRepo.findOne({
+      where: { data_collector_task_id: id },
+    });
+    if (existingSubmission) {
+      throw new AppError(400, "This task can no longer be edited because a submission has already been created. Please refresh the page.");
+    }
+
     const previousAssignee = task.assigned_to_user_id;
 
     if (params.title !== undefined) task.title = params.title;

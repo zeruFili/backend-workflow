@@ -514,6 +514,13 @@ export class DesignerService {
       throw new AppError(403, DESIGNER_TASK_LIST_FORBIDDEN_MESSAGE);
     }
 
+    const existingSubmission = await this.submissionRepo.findOne({
+      where: { designer_task_id: id },
+    });
+    if (existingSubmission) {
+      throw new AppError(400, "This task can no longer be edited because a submission has already been created. Please refresh the page.");
+    }
+
     const previousAssignee = task.assigned_to_user_id;
 
     if (params.title !== undefined) task.title = params.title;
