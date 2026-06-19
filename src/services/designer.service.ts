@@ -521,6 +521,13 @@ export class DesignerService {
       throw new AppError(400, "This task can no longer be edited because a submission has already been created. Please refresh the page.");
     }
 
+    if (task.assigned_to_user_id && task.assigned_at) {
+      const hoursSinceAssignment = (Date.now() - task.assigned_at.getTime()) / (1000 * 60 * 60);
+      if (hoursSinceAssignment > 48) {
+        throw new AppError(400, "This task can no longer be edited because the 2-day editing window has expired since assignment.");
+      }
+    }
+
     const previousAssignee = task.assigned_to_user_id;
 
     if (params.title !== undefined) task.title = params.title;
@@ -575,10 +582,10 @@ export class DesignerService {
       if (assignedAt) {
         const hoursSinceAssignment =
           (Date.now() - assignedAt.getTime()) / (1000 * 60 * 60);
-        if (hoursSinceAssignment < 48) {
+        if (hoursSinceAssignment > 48) {
           throw new AppError(
             409,
-            "Cannot reassign yet: the current designer must have at least 2 days to make a submission before reassignment is allowed."
+            "Cannot reassign: the 2-day editing window has expired. Task updates are no longer allowed after 2 days from assignment."
           );
         }
       }
