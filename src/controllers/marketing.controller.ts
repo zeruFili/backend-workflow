@@ -40,6 +40,7 @@ export class MarketingController {
         return;
       }
 
+      console.log('[MarketingController] findAllTasks called - user:', req.user.id, req.user.role);
       const page = parseInt((req.query.page as string) || "1", 10);
       const limit = Math.min(100, parseInt((req.query.limit as string) || "20", 10));
       const status = req.query.status as string | undefined;
@@ -53,6 +54,13 @@ export class MarketingController {
         currentUser: req.user,
       });
 
+      const submissionCounts = result.data?.map((t: any) => ({
+        id: t.id,
+        title: t.title,
+        submissionsCount: t.submissionsWithReviews?.submissions?.length || 0,
+      }));
+      console.log('[MarketingController] findAllTasks returning:', JSON.stringify(submissionCounts, null, 2));
+
       res.status(200).json(result);
     } catch (error) {
       next(error);
@@ -62,7 +70,9 @@ export class MarketingController {
   async findTaskById(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
       const id = req.params.id as string;
+      console.log('[MarketingController] findTaskById called - id:', id);
       const task = await marketingService.findTaskById(id, req.user);
+      console.log('[MarketingController] findTaskById returning - id:', id, 'submissions:', (task as any).submissions?.length || 0);
       res.status(200).json({ success: true, data: task });
     } catch (error) {
       next(error);

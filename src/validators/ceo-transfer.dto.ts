@@ -1,4 +1,5 @@
 import { IsString, IsOptional, Length, IsUUID, IsNumber, IsPositive, IsArray } from "class-validator";
+import { Type } from "class-transformer";
 
 export class CreateCeoTransferDto {
   @IsUUID()
@@ -11,6 +12,7 @@ export class CreateCeoTransferDto {
   @Length(1, 5000)
   description: string;
 
+  @Type(() => Number)
   @IsNumber()
   @IsPositive()
   amount: number;
@@ -36,6 +38,7 @@ export class UpdateCeoTransferDto {
   description?: string;
 
   @IsOptional()
+  @Type(() => Number)
   @IsNumber()
   @IsPositive()
   amount?: number;

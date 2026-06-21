@@ -139,7 +139,12 @@ export class MarketingService {
     const [data, total] = await qb.skip(skip).take(limit).getManyAndCount();
 
     const taskIds = data.map((t) => t.id);
+    console.log('[MarketingService] findAllTasks - taskIds:', taskIds);
     const submissionsByTask = await this.batchSubmissionsWithReviews(taskIds, currentUser.id);
+    console.log('[MarketingService] findAllTasks - submissionsByTask keys:', Object.keys(submissionsByTask));
+    for (const [tid, swr] of Object.entries(submissionsByTask)) {
+      console.log(`[MarketingService] Task ${tid}: ${swr.submissions.length} submissions`);
+    }
 
     // Sort by latest activity (task, submission, or review timestamps) descending
     data.sort((a, b) => {
@@ -174,15 +179,17 @@ export class MarketingService {
   }
 
   private async batchSubmissionsWithReviews(taskIds: string[], userId: string): Promise<Record<string, any>> {
+    console.log('[MarketingService] batchSubmissionsWithReviews called with taskIds:', taskIds);
     if (taskIds.length === 0) return {};
 
     const submissions = await this.submissionRepo.find({
-      where: taskIds.map((id) => ({ marketing_task_id: id } as any)),
+      where: { marketing_task_id: In(taskIds) },
     });
+    console.log(`[MarketingService] batchSubmissionsWithReviews found ${submissions.length} submissions`);
 
     const allReviews = submissions.length > 0
       ? await this.reviewRepo.find({
-          where: submissions.map((s) => ({ marketing_submission_id: s.id } as any)),
+          where: { marketing_submission_id: In(submissions.map((s) => s.id)) },
           relations: ["reviewer_user"],
         })
       : [];
@@ -311,8 +318,29 @@ export class MarketingService {
       where: { marketing_task_id: id },
       order: { created_at: "DESC" },
     });
+    console.log(`[MarketingService] findTaskById - found ${submissions.length} submissions for task ${id}`);
 
-    return this.sanitizeTask({ ...task, submissions });
+    const reviewRepo = this.reviewRepo;
+    const allReviews = submissions.length > 0
+      ? await reviewRepo.find({
+          where: submissions.map((s) => ({ marketing_submission_id: s.id } as any)),
+          relations: ["reviewer_user"],
+        })
+      : [];
+    console.log(`[MarketingService] findTaskById - found ${allReviews.length} reviews for task ${id}`);
+
+    const reviewsBySubmission: Record<string, any[]> = {};
+    for (const r of allReviews) {
+      if (!reviewsBySubmission[r.marketing_submission_id]) reviewsBySubmission[r.marketing_submission_id] = [];
+      reviewsBySubmission[r.marketing_submission_id].push(r);
+    }
+
+    const submissionsWithReviews = submissions.map((s) => ({
+      ...s,
+      reviews: reviewsBySubmission[s.id] || [],
+    }));
+
+    return this.sanitizeTask({ ...task, submissions: submissionsWithReviews });
   }
 
   async createTask(params: CreateTaskParams, marketingUserId: string) {
