@@ -78,6 +78,11 @@ export class MarketingController {
 
       const dto = await validateDto(CreateMarketingTaskDto, req.body, req);
 
+      if (!dto.description?.trim() && !dto.service_description?.trim()) {
+        cleanupUploadedFiles(req);
+        throw new AppError(400, "Either description or service_description is required.");
+      }
+
       const filePaths = getFilePathsFromRequest(req, "marketing_tasks");
       const mergedUrls = [...filePaths, ...(dto.attachment_urls || [])];
 

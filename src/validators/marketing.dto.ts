@@ -1,4 +1,5 @@
-import { IsString, IsEnum, IsOptional, Length, IsArray, IsNumber, IsPositive } from "class-validator";
+import { IsString, IsEnum, IsOptional, Length, IsArray, IsNumber, IsPositive, ValidateIf } from "class-validator";
+import { Type } from "class-transformer";
 import { ReviewOutcome } from "../enums/review-outcome.enum";
 import { TaskState } from "../enums/task-state.enum";
 
@@ -7,9 +8,10 @@ export class CreateMarketingTaskDto {
   @Length(1, 500)
   title: string;
 
+  @ValidateIf((o) => !o.service_description || o.service_description.trim() === '')
   @IsString()
   @Length(1, 5000)
-  description: string;
+  description?: string;
 
   @IsOptional()
   @IsString()
@@ -41,15 +43,17 @@ export class CreateMarketingTaskDto {
   @Length(1, 255)
   category: string;
 
+  @ValidateIf((o) => !o.description || o.description.trim() === '')
   @IsString()
   @Length(1, 5000)
-  service_description: string;
+  service_description?: string;
 
   @IsOptional()
   @IsString()
   preferred_start_date?: string;
 
   @IsOptional()
+  @Type(() => Number)
   @IsNumber()
   @IsPositive()
   budget?: number;
@@ -123,6 +127,7 @@ export class UpdateMarketingTaskDto {
   preferred_start_date?: string;
 
   @IsOptional()
+  @Type(() => Number)
   @IsNumber()
   @IsPositive()
   budget?: number;

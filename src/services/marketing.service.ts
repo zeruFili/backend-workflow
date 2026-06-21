@@ -26,7 +26,7 @@ interface PaginatedParams {
 
 interface CreateTaskParams {
   title: string;
-  description: string;
+  description?: string;
   due_date?: string;
   attachment_urls?: string[];
   customer_name: string;
@@ -34,7 +34,7 @@ interface CreateTaskParams {
   customer_email?: string;
   customer_address: string;
   category: string;
-  service_description: string;
+  service_description?: string;
   preferred_start_date?: string;
   budget?: number;
   notes?: string;
@@ -335,7 +335,7 @@ export class MarketingService {
     const task = new MarketingTask();
     task.marketing_user_id = marketingUserId;
     task.title = params.title;
-    task.description = params.description;
+    task.description = params.description || '';
     task.due_date = params.due_date ?? null as any;
     task.status = ReviewOutcome.PENDING;
     task.task_state = TaskState.ACTIVE;
@@ -345,7 +345,7 @@ export class MarketingService {
     task.customer_email = params.customer_email ?? null as any;
     task.customer_address = params.customer_address;
     task.category = params.category;
-    task.service_description = params.service_description;
+    task.service_description = params.service_description || '';
     task.preferred_start_date = params.preferred_start_date ?? null as any;
     task.budget = params.budget ?? null as any;
     task.notes = params.notes ?? null as any;
