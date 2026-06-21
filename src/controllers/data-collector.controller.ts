@@ -235,6 +235,21 @@ export class DataCollectorController {
       next(error);
     }
   }
+
+  async removeTask(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      if (!req.user) {
+        res.status(401).json({ success: false, message: "Unauthorized" });
+        return;
+      }
+
+      const taskId = req.params.id as string;
+      const task = await dataCollectorService.removeTask(taskId);
+      res.status(200).json({ success: true, data: task, message: "Data collector task deleted successfully" });
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 export const dataCollectorController = new DataCollectorController();

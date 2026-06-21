@@ -140,6 +140,8 @@ export class DataCollectorService {
       throw new AppError(403, "You are not authorized to view data collector tasks.");
     }
 
+    qb.andWhere("t.task_state = :activeState", { activeState: TaskState.ACTIVE });
+
     if (status) qb.andWhere("t.status = :status", { status });
     if (assignedTo) qb.andWhere("t.assigned_to_user_id = :assignedTo", { assignedTo });
 
@@ -659,6 +661,33 @@ export class DataCollectorService {
       ...r,
       reviewer_user: pickSafeUserFields(r.reviewer_user),
     }));
+  }
+
+  async removeTask(taskId: string) {
+    const task = await this.taskRepo.findOneBy({ id: taskId });
+    if (!task) throw new AppError(404, "Data collector task not found");
+
+    const submissions = await this.submissionRepo.find({
+      where: { data_collector_task_id: taskId },
+    });
+    if (submissions.length > 0) {
+      throw new AppError(400, "Cannot delete task: one or more submissions exist for this task");
+    }
+
+    if (task.assigned_to_user_id) {
+      const assignmentDate = task.updated_at ? new Date(task.updated_at) : null;
+      if (assignmentDate) {
+        const threeDaysMs = 3 * 24 * 60 * 60 * 1000;
+        if (Date.now() - assignmentDate.getTime() > threeDaysMs) {
+          throw new AppError(400, "Cannot delete task: more than 3 days have passed since assignment");
+        }
+      }
+    }
+
+    task.task_state = TaskState.DEACTIVE;
+    task.updated_at = new Date();
+    await this.taskRepo.save(task);
+    return task;
   }
 }
 

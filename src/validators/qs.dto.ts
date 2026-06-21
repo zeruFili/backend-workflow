@@ -1,5 +1,6 @@
 import { IsString, IsEnum, IsOptional, Length, IsUUID, IsArray } from "class-validator";
 import { ReviewOutcome } from "../enums/review-outcome.enum";
+import { SubmissionReviewStatus } from "../enums/submission-review-status.enum";
 
 export class CreateQSTaskDto {
   @IsString()
@@ -14,8 +15,9 @@ export class CreateQSTaskDto {
   @IsUUID()
   assigned_to_user_id?: string;
 
+  @IsOptional()
   @IsString()
-  due_date: string;
+  due_date?: string;
 
   @IsOptional()
   @IsArray()
@@ -56,6 +58,10 @@ export class CreateQSSubmissionDto {
   @IsString()
   @Length(1, 5000)
   description: string;
+
+  @IsOptional()
+  @IsEnum(SubmissionReviewStatus)
+  status?: SubmissionReviewStatus;
 }
 
 export class CreateQSReviewDto {

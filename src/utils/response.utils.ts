@@ -13,6 +13,7 @@ export interface CeoUserOutput {
   role: string;
   phone: string | null;
   last_login_at: Date | null;
+  is_active: boolean;
 }
 
 export function pickSafeUserFields(user: User | null | undefined): SafeUserOutput | null {
@@ -33,5 +34,6 @@ export function pickCeoUserFields(user: User | null | undefined): CeoUserOutput 
     role: user.role,
     phone: user.phone ?? null,
     last_login_at: user.last_login_at ?? null,
+    is_active: user.is_active,
   };
 }

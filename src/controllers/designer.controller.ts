@@ -421,13 +421,10 @@ export class DesignerController {
       }
 
       const taskId = req.params.id as string;
-      const { reason } = req.body as { reason: string };
-      if (!reason || typeof reason !== "string" || reason.trim().length === 0) {
-        res.status(400).json({ success: false, message: "Reason is required" });
-        return;
-      }
+      const { reason } = (req.body || {}) as { reason?: string };
+      const reasonStr = (reason && typeof reason === "string" && reason.trim().length > 0) ? reason.trim() : "Task removed by admin";
 
-      const task = await designerService.removeTask(taskId, req.user.id, reason.trim());
+      const task = await designerService.removeTask(taskId, req.user.id, reasonStr);
       res.status(200).json({ success: true, data: task, message: "Task removed successfully" });
     } catch (error) {
       next(error);

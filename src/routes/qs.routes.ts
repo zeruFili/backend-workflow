@@ -78,5 +78,6 @@ router.post(
 router.get("/qs-submissions/:id/reviews", authenticate, (req, res, next) => quantitySurveyorController.getReviews(req, res, next));
 router.post("/qs-submissions/:id/review", authenticate, authorize(UserRole.CEO, UserRole.GENERAL_MANAGER), (req, res, next) => quantitySurveyorController.createReview(req, res, next));
 router.patch("/qs-reviews/:id", authenticate, authorize(UserRole.CEO, UserRole.GENERAL_MANAGER), (req, res, next) => quantitySurveyorController.updateReview(req, res, next));
+router.delete("/qs-tasks/:id", authenticate, authorize(UserRole.CEO, UserRole.GENERAL_MANAGER), (req, res, next) => quantitySurveyorController.removeTask(req, res, next));
 
 export default router;

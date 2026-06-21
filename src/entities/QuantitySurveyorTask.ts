@@ -38,7 +38,7 @@ export class QuantitySurveyorTask {
   @Column({ type: "enum", enum: TaskState })
   task_state: TaskState;
 
-  @Column({ type: "date" })
+  @Column({ type: "date", nullable: true })
   due_date: string;
 
   @Column({ type: "text", array: true, nullable: true })

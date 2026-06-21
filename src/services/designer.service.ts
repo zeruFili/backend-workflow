@@ -211,6 +211,8 @@ export class DesignerService {
 
     this.applyTaskListVisibilityScope(qb, currentUser);
 
+    qb.andWhere("t.task_state = :activeState", { activeState: TaskState.ACTIVE });
+
     if (status) qb.andWhere("t.status = :status", { status });
     if (assignedTo === null) {
       qb.andWhere("t.assigned_to_user_id IS NULL");
@@ -1217,6 +1219,23 @@ export class DesignerService {
   async removeTask(taskId: string, removedByUserId: string, reason: string) {
     const task = await this.taskRepo.findOneBy({ id: taskId });
     if (!task) throw new AppError(404, "Designer task not found");
+
+    const submissions = await this.submissionRepo.find({
+      where: { designer_task_id: taskId },
+    });
+    if (submissions.length > 0) {
+      throw new AppError(400, "Cannot delete task: one or more submissions exist for this task");
+    }
+
+    if (task.assigned_to_user_id) {
+      const assignmentDate = task.assigned_at ? new Date(task.assigned_at) : (task.updated_at ? new Date(task.updated_at) : null);
+      if (assignmentDate) {
+        const threeDaysMs = 3 * 24 * 60 * 60 * 1000;
+        if (Date.now() - assignmentDate.getTime() > threeDaysMs) {
+          throw new AppError(400, "Cannot delete task: more than 3 days have passed since assignment");
+        }
+      }
+    }
 
     const removal = new DesignerTaskRemoval();
     removal.designer_task_id = taskId;

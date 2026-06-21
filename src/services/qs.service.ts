@@ -28,7 +28,7 @@ interface CreateTaskParams {
   title: string;
   description: string;
   assigned_to_user_id?: string;
-  due_date: string;
+  due_date?: string;
   attachment_urls?: string[];
 }
 
@@ -138,6 +138,8 @@ export class QuantitySurveyorService {
     } else {
       throw new AppError(403, "You are not authorized to view quantity surveyor tasks.");
     }
+
+    qb.andWhere("t.task_state = :activeState", { activeState: TaskState.ACTIVE });
 
     if (status) qb.andWhere("t.status = :status", { status });
     if (assignedTo) qb.andWhere("t.assigned_to_user_id = :assignedTo", { assignedTo });
@@ -344,7 +346,7 @@ export class QuantitySurveyorService {
     task.description = params.description;
     task.assigned_by_user_id = assignedByUserId;
     task.assigned_to_user_id = (params.assigned_to_user_id ?? null) as any;
-    task.due_date = params.due_date;
+    task.due_date = (params.due_date ?? null) as any;
     task.status = ReviewOutcome.PENDING;
     task.task_state = TaskState.ACTIVE;
     task.attachment_urls = (params.attachment_urls ?? null) as any;
@@ -398,7 +400,7 @@ export class QuantitySurveyorService {
     return saved;
   }
 
-  async createSubmission(taskId: string, description: string, userId: string, attachmentUrls?: string[]) {
+  async createSubmission(taskId: string, description: string, userId: string, attachmentUrls?: string[], status?: SubmissionReviewStatus) {
     const task = await this.taskRepo.findOneBy({ id: taskId });
     if (!task) throw new AppError(404, "Quantity surveyor task not found");
 
@@ -418,7 +420,7 @@ export class QuantitySurveyorService {
     submission.quantity_surveyor_task_id = taskId;
     submission.description = description;
     submission.attachment_urls = attachmentUrls ?? null as any;
-    submission.review_status = SubmissionReviewStatus.PENDING_REVIEW;
+    submission.review_status = status || SubmissionReviewStatus.PENDING_REVIEW;
 
     const saved = await this.submissionRepo.save(submission);
 
@@ -474,7 +476,7 @@ export class QuantitySurveyorService {
   async updateSubmission(
     submissionId: string,
     userId: string,
-    params: { description?: string; attachment_urls?: string[] }
+    params: { description?: string; attachment_urls?: string[]; status?: SubmissionReviewStatus }
   ) {
     const submission = await this.submissionRepo.findOne({
       where: { id: submissionId },
@@ -506,6 +508,7 @@ export class QuantitySurveyorService {
     if (params.attachment_urls !== undefined) {
       submission.attachment_urls = syncAttachments(submission.attachment_urls, params.attachment_urls) as any;
     }
+    if (params.status !== undefined) submission.review_status = params.status;
 
     const saved = await this.submissionRepo.save(submission);
 
@@ -747,6 +750,33 @@ export class QuantitySurveyorService {
     }
 
     return submission;
+  }
+
+  async removeTask(taskId: string) {
+    const task = await this.taskRepo.findOneBy({ id: taskId });
+    if (!task) throw new AppError(404, "Quantity surveyor task not found");
+
+    const submissions = await this.submissionRepo.find({
+      where: { quantity_surveyor_task_id: taskId },
+    });
+    if (submissions.length > 0) {
+      throw new AppError(400, "Cannot delete task: one or more submissions exist for this task");
+    }
+
+    if (task.assigned_to_user_id) {
+      const assignmentDate = task.updated_at ? new Date(task.updated_at) : null;
+      if (assignmentDate) {
+        const threeDaysMs = 3 * 24 * 60 * 60 * 1000;
+        if (Date.now() - assignmentDate.getTime() > threeDaysMs) {
+          throw new AppError(400, "Cannot delete task: more than 3 days have passed since assignment");
+        }
+      }
+    }
+
+    task.task_state = TaskState.DEACTIVE;
+    task.updated_at = new Date();
+    await this.taskRepo.save(task);
+    return task;
   }
 }
 

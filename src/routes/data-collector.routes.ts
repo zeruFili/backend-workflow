@@ -46,5 +46,6 @@ router.patch(
 router.get("/data-collector-submissions/:id/reviews", authenticate, (req, res, next) => dataCollectorController.getReviews(req, res, next));
 router.post("/data-collector-submissions/:id/review", authenticate, authorize(UserRole.CEO, UserRole.GENERAL_MANAGER), (req, res, next) => dataCollectorController.createReview(req, res, next));
 router.patch("/data-collector-reviews/:id", authenticate, authorize(UserRole.CEO, UserRole.GENERAL_MANAGER), (req, res, next) => dataCollectorController.updateReview(req, res, next));
+router.delete("/data-collector-tasks/:id", authenticate, authorize(UserRole.CEO, UserRole.GENERAL_MANAGER), (req, res, next) => dataCollectorController.removeTask(req, res, next));
 
 export default router;

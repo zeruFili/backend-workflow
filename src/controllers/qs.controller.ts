@@ -137,7 +137,8 @@ export class QuantitySurveyorController {
         taskId,
         dto.description,
         req.user.id,
-        mergedUrls.length > 0 ? mergedUrls : undefined
+        mergedUrls.length > 0 ? mergedUrls : undefined,
+        dto.status
       );
       res.status(201).json({ success: true, data: submission, message: "Submission created successfully" });
     } catch (error) {
@@ -163,7 +164,7 @@ export class QuantitySurveyorController {
       }
 
       const submissionId = req.params.id as string;
-      const { description } = req.body;
+      const { description, status } = req.body;
 
       const filePaths = getFilePathsFromRequest(req, "qs_submissions");
       const bodyAttachmentUrls = req.body.attachment_urls as string[] | undefined;
@@ -173,6 +174,7 @@ export class QuantitySurveyorController {
       const submission = await quantitySurveyorService.updateSubmission(submissionId, req.user.id, {
         description,
         attachment_urls: mergedUrls,
+        status,
       });
 
       res.status(200).json({ success: true, data: submission, message: "Submission updated successfully" });
@@ -308,6 +310,21 @@ export class QuantitySurveyorController {
         req.user.id
       );
       res.status(200).json({ success: true, data: review, message: "Review updated successfully" });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async removeTask(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      if (!req.user) {
+        res.status(401).json({ success: false, message: "Unauthorized" });
+        return;
+      }
+
+      const taskId = req.params.id as string;
+      const task = await quantitySurveyorService.removeTask(taskId);
+      res.status(200).json({ success: true, data: task, message: "Quantity surveyor task deleted successfully" });
     } catch (error) {
       next(error);
     }
