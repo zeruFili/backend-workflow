@@ -124,6 +124,8 @@ export class MarketingService {
       throw new AppError(403, "You are not authorized to view marketing tasks.");
     }
 
+    qb.andWhere("t.task_state = :taskState", { taskState: TaskState.ACTIVE });
+
     if (status) qb.andWhere("t.status = :status", { status });
 
     if (search) {
@@ -435,6 +437,27 @@ export class MarketingService {
     await this.refreshResourceNotifications(id, userId);
 
     return saved;
+  }
+
+  async removeTask(id: string, userId: string) {
+    const task = await this.taskRepo.findOneBy({ id });
+    if (!task) throw new AppError(404, "Marketing task not found");
+
+    if (task.marketing_user_id !== userId) {
+      throw new AppError(403, "Only the creator can delete this marketing task.");
+    }
+
+    const submissions = await this.submissionRepo.find({
+      where: { marketing_task_id: id },
+    });
+    if (submissions.length > 0) {
+      throw new AppError(400, "Cannot delete a task that has submissions.");
+    }
+
+    task.task_state = TaskState.DEACTIVE;
+    task.updated_by = userId as any;
+    task.updated_at = new Date();
+    return this.taskRepo.save(task);
   }
 
   async createSubmission(taskId: string, description: string, userId: string, attachmentUrls?: string[]) {

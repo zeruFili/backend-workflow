@@ -62,11 +62,9 @@ async function cleanupOldMarketingTables() {
          OR resource_type IN ('payment_submitted', 'clarification_requested', 'clarification_response')
     `);
     await cleanupDs.query(`DROP TABLE IF EXISTS paid_customer_review CASCADE`);
-    await cleanupDs.query(`DROP TABLE IF EXISTS marketing_review CASCADE`);
-    await cleanupDs.query(`DROP TABLE IF EXISTS marketing_submission CASCADE`);
     await cleanupDs.query(`DROP TABLE IF EXISTS paid_customer CASCADE`);
     await cleanupDs.query(`DROP TABLE IF EXISTS customer CASCADE`);
-    console.log("Marketing module data reset complete");
+    console.log("Old marketing tables cleaned up");
   } catch (e: any) {
     console.log("Marketing cleanup (non-fatal):", e.message);
   } finally {

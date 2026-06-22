@@ -48,6 +48,13 @@ router.patch(
   (req, res, next) => marketingController.updateTask(req as any, res, next)
 );
 
+router.delete(
+  "/marketing-tasks/:id",
+  authenticate,
+  authorize(UserRole.CEO, UserRole.MARKETING),
+  (req, res, next) => marketingController.removeTask(req as any, res, next)
+);
+
 router.get(
   "/marketing-tasks/:id/submissions",
   authenticate,
@@ -58,7 +65,7 @@ router.get(
 router.post(
   "/marketing-tasks/:id/submissions",
   authenticate,
-  authorize(UserRole.MARKETING),
+  authorize(UserRole.MARKETING, UserRole.CEO),
   submissionUploadMiddleware,
   (req, res, next) => marketingController.createSubmission(req as any, res, next)
 );
@@ -66,7 +73,7 @@ router.post(
 router.patch(
   "/marketing-tasks/submit/:id",
   authenticate,
-  authorize(UserRole.MARKETING),
+  authorize(UserRole.MARKETING, UserRole.CEO),
   submissionUploadMiddleware,
   (req, res, next) => marketingController.updateSubmission(req as any, res, next)
 );

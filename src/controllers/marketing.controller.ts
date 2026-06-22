@@ -132,6 +132,20 @@ export class MarketingController {
     }
   }
 
+  async removeTask(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      if (!req.user) {
+        res.status(401).json({ success: false, message: "Unauthorized" });
+        return;
+      }
+      const id = req.params.id as string;
+      const task = await marketingService.removeTask(id, req.user.id);
+      res.status(200).json({ success: true, data: task, message: "Marketing task deleted successfully" });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async createSubmission(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
       if (!req.user) {
