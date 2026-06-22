@@ -97,6 +97,16 @@ export class CeoTransferController {
       next(error);
     }
   }
+
+  async delete(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const id = req.params.id as string;
+      await ceoTransferService.delete(id);
+      res.status(200).json({ success: true, message: "CEO transfer deleted" });
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 export const ceoTransferController = new CeoTransferController();

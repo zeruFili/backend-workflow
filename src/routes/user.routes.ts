@@ -5,8 +5,8 @@ import { userController } from "../controllers/user.controller";
 
 const router = Router();
 
-router.get("/", authenticate, authorize(UserRole.CEO, UserRole.GENERAL_MANAGER), (req, res, next) => userController.findAll(req, res, next));
-router.get("/:id", authenticate, authorize(UserRole.CEO, UserRole.GENERAL_MANAGER), (req, res, next) => userController.findById(req, res, next));
+router.get("/", authenticate, authorize(UserRole.CEO, UserRole.GENERAL_MANAGER, UserRole.FINANCE), (req, res, next) => userController.findAll(req, res, next));
+router.get("/:id", authenticate, authorize(UserRole.CEO, UserRole.GENERAL_MANAGER, UserRole.FINANCE), (req, res, next) => userController.findById(req, res, next));
 
 router.use(authenticate, authorize(UserRole.CEO));
 

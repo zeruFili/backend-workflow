@@ -133,6 +133,14 @@ export class CeoTransferService {
 
     return this.repo.save(transfer);
   }
+
+  async delete(id: string) {
+    const transfer = await this.repo.findOneBy({ id });
+    if (!transfer) throw new AppError(404, "CEO transfer not found");
+
+    await this.repo.remove(transfer);
+    return { id };
+  }
 }
 
 export const ceoTransferService = new CeoTransferService();

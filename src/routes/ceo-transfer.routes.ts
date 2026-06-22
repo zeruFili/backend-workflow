@@ -42,4 +42,11 @@ router.patch(
   (req, res, next) => ceoTransferController.update(req, res, next)
 );
 
+router.delete(
+  "/ceo-transfers/:id",
+  authenticate,
+  authorize(UserRole.FINANCE, UserRole.CEO),
+  (req, res, next) => ceoTransferController.delete(req, res, next)
+);
+
 export default router;
