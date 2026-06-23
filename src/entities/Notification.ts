@@ -8,12 +8,7 @@ import { ParentType } from "../enums/parent-type.enum";
 
 @Entity("notification")
 @Index("idx_notif_user_parent", ["user_id", "parent_id", "viewed"])
-@Index("idx_notif_user_resource", ["user_id", "resource_id", "viewed"]) // i can use this when i try to update as viewed
-
-// it am thinking to remove this indexes because they are not that much useful
-
-@Index("idx_notif_user_resource_type", ["user_id", "resource_type", "viewed"])
-@Index("idx_notif_user_parent_type", ["user_id", "parent_type", "viewed"])
+@Index("idx_notif_user_parent_type", ["user_id", "viewed", "parent_type", "resource_type"])
 export class Notification {
   @PrimaryGeneratedColumn("uuid")
   id: string;
