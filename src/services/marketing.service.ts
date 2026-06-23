@@ -614,6 +614,13 @@ export class MarketingService {
       throw new AppError(400, "Cannot review a submission for a deactivated task");
     }
 
+    const existingReview = await this.reviewRepo.findOneBy({
+      marketing_submission_id: submissionId,
+    });
+    if (existingReview) {
+      throw new AppError(400, "A review already exists for this submission. Please update the existing review instead.");
+    }
+
     const review = new MarketingReview();
     review.marketing_submission_id = submissionId;
     review.reviewer_user_id = reviewerUserId;
@@ -677,11 +684,14 @@ export class MarketingService {
       throw new AppError(400, "A newer submission exists for this task. Cannot update review.");
     }
 
-    const otherReview = await this.reviewRepo.findOneBy({
-      marketing_submission_id: submission.id,
-    });
-    if (otherReview && otherReview.id !== reviewId) {
-      throw new AppError(400, "Another review already exists for this submission. This review cannot be edited.");
+    const newerReview = await this.reviewRepo
+      .createQueryBuilder("mr")
+      .where("mr.marketing_submission_id = :subId", { subId: submission.id })
+      .andWhere("mr.id != :revId", { revId: reviewId })
+      .andWhere("mr.created_at > :reviewCreatedAt", { reviewCreatedAt: review.created_at })
+      .getOne();
+    if (newerReview) {
+      throw new AppError(400, "A newer review already exists for this submission. This review cannot be edited.");
     }
 
     const twentyFourHours = 24 * 60 * 60 * 1000;

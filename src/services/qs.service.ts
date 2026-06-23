@@ -397,6 +397,24 @@ export class QuantitySurveyorService {
 
     await this.refreshResourceNotifications(id, userId);
 
+    const updaterUser = await this.userRepo.findOneBy({ id: userId });
+    if (updaterUser?.role !== UserRole.GENERAL_MANAGER) {
+      const gmUsers = await this.userRepo.find({
+        where: { role: UserRole.GENERAL_MANAGER, is_active: true },
+      });
+      for (const gm of gmUsers) {
+        await this.createNotification({
+          user_id: gm.id,
+          from_user_id: userId,
+          resource_id: id,
+          resource_type: ResourceType.TASK_ASSIGNED,
+          parent_id: id,
+          parent_type: ParentType.QUANTITY_SURVEYOR_TASK,
+          type: "Quantity surveyor task updated",
+        });
+      }
+    }
+
     return saved;
   }
 
@@ -542,6 +560,13 @@ export class QuantitySurveyorService {
       throw new AppError(400, "Cannot review a submission for a deactivated task");
     }
 
+    const existingReview = await this.reviewRepo.findOneBy({
+      quantity_surveyor_submission_id: submissionId,
+    });
+    if (existingReview) {
+      throw new AppError(400, "A review already exists for this submission. Please update the existing review instead.");
+    }
+
     const review = new QuantitySurveyorReview();
     review.quantity_surveyor_submission_id = submissionId;
     review.reviewer_user_id = reviewerUserId;
@@ -570,6 +595,24 @@ export class QuantitySurveyorService {
         parent_type: ParentType.QUANTITY_SURVEYOR_TASK,
         type: `Your submission was ${reviewOutcome}`,
       });
+    }
+
+    const reviewerUser = await this.userRepo.findOneBy({ id: reviewerUserId });
+    if (reviewerUser?.role !== UserRole.GENERAL_MANAGER) {
+      const gmUsers = await this.userRepo.find({
+        where: { role: UserRole.GENERAL_MANAGER, is_active: true },
+      });
+      for (const gm of gmUsers) {
+        await this.createNotification({
+          user_id: gm.id,
+          from_user_id: reviewerUserId,
+          resource_id: saved.id,
+          resource_type: ResourceType.REVIEW,
+          parent_id: task.id,
+          parent_type: ParentType.QUANTITY_SURVEYOR_TASK,
+          type: `Quantity surveyor review: ${reviewOutcome}`,
+        });
+      }
     }
 
     return saved;
@@ -610,11 +653,14 @@ export class QuantitySurveyorService {
       throw new AppError(400, "A newer submission exists for this task. Cannot update review.");
     }
 
-    const otherReview = await this.reviewRepo.findOneBy({
-      quantity_surveyor_submission_id: submission.id,
-    });
-    if (otherReview && otherReview.id !== reviewId) {
-      throw new AppError(400, "Another review already exists for this submission. This review cannot be edited.");
+    const newerReview = await this.reviewRepo
+      .createQueryBuilder("qsr")
+      .where("qsr.quantity_surveyor_submission_id = :subId", { subId: submission.id })
+      .andWhere("qsr.id != :revId", { revId: reviewId })
+      .andWhere("qsr.created_at > :reviewCreatedAt", { reviewCreatedAt: review.created_at })
+      .getOne();
+    if (newerReview) {
+      throw new AppError(400, "A newer review already exists for this submission. This review cannot be edited.");
     }
 
     const twentyFourHours = 24 * 60 * 60 * 1000;

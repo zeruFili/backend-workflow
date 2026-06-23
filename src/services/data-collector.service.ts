@@ -398,6 +398,24 @@ export class DataCollectorService {
 
     await this.refreshResourceNotifications(id, userId);
 
+    const updaterUser = await this.userRepo.findOneBy({ id: userId });
+    if (updaterUser?.role !== UserRole.GENERAL_MANAGER) {
+      const gmUsers = await this.userRepo.find({
+        where: { role: UserRole.GENERAL_MANAGER, is_active: true },
+      });
+      for (const gm of gmUsers) {
+        await this.createNotification({
+          user_id: gm.id,
+          from_user_id: userId,
+          resource_id: id,
+          resource_type: ResourceType.TASK_ASSIGNED,
+          parent_id: id,
+          parent_type: ParentType.DATA_COLLECTOR_TASK,
+          type: "Data collector task updated",
+        });
+      }
+    }
+
     return saved;
   }
 
@@ -543,6 +561,13 @@ export class DataCollectorService {
       throw new AppError(400, "Cannot review a submission for a deactivated task");
     }
 
+    const existingReview = await this.reviewRepo.findOneBy({
+      data_collector_submission_id: submissionId,
+    });
+    if (existingReview) {
+      throw new AppError(400, "A review already exists for this submission. Please update the existing review instead.");
+    }
+
     const review = new DataCollectorReview();
     review.data_collector_submission_id = submissionId;
     review.reviewer_user_id = reviewerUserId;
@@ -569,6 +594,24 @@ export class DataCollectorService {
         parent_type: ParentType.DATA_COLLECTOR_TASK,
         type: `Your submission was ${reviewOutcome}`,
       });
+    }
+
+    const reviewerUser = await this.userRepo.findOneBy({ id: reviewerUserId });
+    if (reviewerUser?.role !== UserRole.GENERAL_MANAGER) {
+      const gmUsers = await this.userRepo.find({
+        where: { role: UserRole.GENERAL_MANAGER, is_active: true },
+      });
+      for (const gm of gmUsers) {
+        await this.createNotification({
+          user_id: gm.id,
+          from_user_id: reviewerUserId,
+          resource_id: saved.id,
+          resource_type: ResourceType.REVIEW,
+          parent_id: task.id,
+          parent_type: ParentType.DATA_COLLECTOR_TASK,
+          type: `Data collector review: ${reviewOutcome}`,
+        });
+      }
     }
 
     return saved;
@@ -610,11 +653,14 @@ export class DataCollectorService {
       throw new AppError(400, "A newer submission exists for this task. Cannot update review.");
     }
 
-    const otherReview = await this.reviewRepo.findOneBy({
-      data_collector_submission_id: submission.id,
-    });
-    if (otherReview && otherReview.id !== reviewId) {
-      throw new AppError(400, "Another review already exists for this submission. This review cannot be edited.");
+    const newerReview = await this.reviewRepo
+      .createQueryBuilder("dcr")
+      .where("dcr.data_collector_submission_id = :subId", { subId: submission.id })
+      .andWhere("dcr.id != :revId", { revId: reviewId })
+      .andWhere("dcr.created_at > :reviewCreatedAt", { reviewCreatedAt: review.created_at })
+      .getOne();
+    if (newerReview) {
+      throw new AppError(400, "A newer review already exists for this submission. This review cannot be edited.");
     }
 
     const twentyFourHours = 24 * 60 * 60 * 1000;
