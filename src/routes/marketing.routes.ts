@@ -21,7 +21,7 @@ const submissionUploadMiddleware = createUploadFileMiddleware({
 router.get(
   "/marketing-tasks",
   authenticate,
-  authorize(UserRole.CEO, UserRole.FINANCE, UserRole.MARKETING),
+  authorize(UserRole.CEO, UserRole.FINANCE, UserRole.MARKETING, UserRole.GENERAL_MANAGER),
   (req, res, next) => marketingController.findAllTasks(req as any, res, next)
 );
 
@@ -36,7 +36,7 @@ router.post(
 router.get(
   "/marketing-tasks/:id",
   authenticate,
-  authorize(UserRole.CEO, UserRole.FINANCE, UserRole.MARKETING),
+  authorize(UserRole.CEO, UserRole.FINANCE, UserRole.MARKETING, UserRole.GENERAL_MANAGER),
   (req, res, next) => marketingController.findTaskById(req as any, res, next)
 );
 
@@ -58,7 +58,7 @@ router.delete(
 router.get(
   "/marketing-tasks/:id/submissions",
   authenticate,
-  authorize(UserRole.CEO, UserRole.FINANCE, UserRole.MARKETING),
+  authorize(UserRole.CEO, UserRole.FINANCE, UserRole.MARKETING, UserRole.GENERAL_MANAGER),
   (req, res, next) => marketingController.getSubmissions(req as any, res, next)
 );
 
@@ -81,7 +81,7 @@ router.patch(
 router.get(
   "/marketing-submissions/:id/reviews",
   authenticate,
-  authorize(UserRole.CEO, UserRole.FINANCE, UserRole.MARKETING),
+  authorize(UserRole.CEO, UserRole.FINANCE, UserRole.MARKETING, UserRole.GENERAL_MANAGER),
   (req, res, next) => marketingController.getReviews(req as any, res, next)
 );
 

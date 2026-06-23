@@ -118,6 +118,8 @@ export class MarketingService {
 
     if (currentUser.role === UserRole.CEO || currentUser.role === UserRole.FINANCE) {
       // CEO and Finance see all tasks
+    } else if (currentUser.role === UserRole.GENERAL_MANAGER) {
+      qb.andWhere("t.status = :approved", { approved: ReviewOutcome.APPROVED });
     } else if (currentUser.role === UserRole.MARKETING) {
       qb.andWhere("t.marketing_user_id = :userId", { userId: currentUser.id });
     } else {
@@ -310,6 +312,10 @@ export class MarketingService {
     if (currentUser) {
       if (currentUser.role === UserRole.CEO || currentUser.role === UserRole.FINANCE) {
         // CEO and Finance can view any task
+      } else if (currentUser.role === UserRole.GENERAL_MANAGER) {
+        if (task.status !== ReviewOutcome.APPROVED) {
+          throw new AppError(403, "General Manager can only view approved marketing tasks.");
+        }
       } else if (currentUser.role === UserRole.MARKETING) {
         if (task.marketing_user_id !== currentUser.id) {
           throw new AppError(403, "You are not authorized to view this marketing task.");
