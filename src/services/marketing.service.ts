@@ -168,13 +168,18 @@ export class MarketingService {
     return {
       success: true,
       data: data.map((task) => {
-        const swr = submissionsByTask[task.id] || { submissions: [] };
+        const swr = submissionsByTask[task.id] || {
+          taskNotification: { hasNotification: false, notificationId: null },
+          submissions: [],
+        };
+        const { taskNotification, ...restSwr } = swr;
         const hasNestedNotification = (swr.submissions || []).some(
           (s: any) => s.hasNotification || (s.reviews || []).some((r: any) => r.hasNotification)
         );
         return {
           ...this.sanitizeTask(task),
-          submissionsWithReviews: swr,
+          taskNotification,
+          submissionsWithReviews: restSwr,
           hasNestedNotification,
         };
       }),
@@ -206,15 +211,10 @@ export class MarketingService {
       reviewsBySubmission[r.marketing_submission_id].push(r);
     }
 
-    const relevantResourceIds = [...taskIds, ...submissions.map((s) => s.id)];
-    if (allReviews.length > 0) {
-      relevantResourceIds.push(...allReviews.map((r) => r.id));
-    }
-
     const unreadNotifications = await this.notificationRepo.find({
       where: {
         user_id: userId,
-        resource_id: In(relevantResourceIds),
+        parent_id: In(taskIds) as any,
         viewed: false,
       },
     });
@@ -238,6 +238,10 @@ export class MarketingService {
 
     for (const taskId of taskIds) {
       const taskSubmissions = submissionsByTask[taskId] || [];
+
+      const taskNotification = notificationMap.has(taskId)
+        ? { hasNotification: true, notificationId: notificationMap.get(taskId) }
+        : { hasNotification: false, notificationId: null };
 
       const submissionsWithReviews = taskSubmissions.map((submission) => {
         const rawReviews = (reviewsBySubmission[submission.id] || []).map((r) => {
@@ -284,6 +288,7 @@ export class MarketingService {
       submissionsWithReviews.sort((a, b) => a._sortTime.getTime() - b._sortTime.getTime());
 
       result[taskId] = {
+        taskNotification,
         submissions: submissionsWithReviews.map(({ _sortTime, ...rest }) => rest),
         latestActivityTs: Math.max(
           ...taskSubmissions.flatMap((sub) => [
