@@ -269,9 +269,12 @@ export class MarketingService {
           : { hasNotification: false, notificationId: null };
 
         return {
-          ...submission,
+          submissionId: submission.id,
           ...subNotif,
-          reviews,
+          submission: {
+            ...submission,
+            reviews,
+          },
           _sortTime: earliestSubmission,
         };
       });
@@ -578,7 +581,7 @@ export class MarketingService {
 
     return this.submissionRepo.find({
       where: { marketing_task_id: taskId },
-      order: { created_at: "DESC" },
+      order: { created_at: "ASC" },
     });
   }
 
