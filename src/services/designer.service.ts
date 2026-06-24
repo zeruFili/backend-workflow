@@ -236,6 +236,9 @@ export class DesignerService {
     const taskIds = data.map((t) => t.id);
     const submissionsByTask = await this.batchSubmissionsWithReviews(taskIds, currentUser.id);
 
+    // Batch-fetch task-level reviews (ratings)
+    const taskReviews = await this.batchTaskReviews(taskIds);
+
     // Sort by latest activity (task, submission, or review timestamps) descending
     data.sort((a, b) => {
       const aTs = Math.max(
@@ -272,6 +275,7 @@ export class DesignerService {
           taskNotification,
           submissionsWithReviews: restSwr,
           hasNestedNotification,
+          taskReview: taskReviews[task.id] || null,
         };
       }),
       meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
@@ -416,6 +420,34 @@ export class DesignerService {
       };
     }
 
+    return result;
+  }
+
+  private async batchTaskReviews(taskIds: string[]): Promise<Record<string, any>> {
+    if (taskIds.length === 0) return {};
+
+    const reviews = await this.taskReviewRepo.find({
+      where: taskIds.map((id) => ({ designer_task_id: id } as any)),
+      relations: ["reviewer_user"],
+    });
+
+    const result: Record<string, any> = {};
+    for (const review of reviews) {
+      result[review.designer_task_id] = {
+        id: review.id,
+        reviewerName: review.reviewer_user?.full_name ?? "Unknown",
+        reviewer_user: pickSafeUserFields(review.reviewer_user ?? null),
+        reviewText: review.description ?? "",
+        ratings: {
+          creativity: review.creativity,
+          timeliness: review.timeliness,
+          rendering: review.rendering_quality,
+          clientUnderstanding: review.client_understanding,
+        },
+        submittedAt: review.created_at?.toISOString() ?? null,
+        updatedAt: review.updated_at?.toISOString() ?? null,
+      };
+    }
     return result;
   }
 
