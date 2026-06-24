@@ -559,21 +559,23 @@ export class DesignerService {
 
     await this.refreshResourceNotifications(id, currentUser.id);
 
-    if (currentUser.role !== UserRole.GENERAL_MANAGER) {
-      const gmUsers = await this.userRepo.find({
-        where: { role: UserRole.GENERAL_MANAGER, is_active: true },
+    const ceoGmUsers = await this.userRepo.find({
+      where: [
+        { role: UserRole.CEO, is_active: true },
+        { role: UserRole.GENERAL_MANAGER, is_active: true },
+      ],
+    });
+    for (const leader of ceoGmUsers) {
+      if (leader.id === currentUser.id) continue;
+      await this.createNotification({
+        user_id: leader.id,
+        from_user_id: currentUser.id,
+        resource_id: id,
+        resource_type: ResourceType.TASK_ASSIGNED,
+        parent_id: id,
+        parent_type: ParentType.DESIGNER_TASK,
+        type: "Designer task updated",
       });
-      for (const gm of gmUsers) {
-        await this.createNotification({
-          user_id: gm.id,
-          from_user_id: currentUser.id,
-          resource_id: id,
-          resource_type: ResourceType.TASK_ASSIGNED,
-          parent_id: id,
-          parent_type: ParentType.DESIGNER_TASK,
-          type: "Designer task updated",
-        });
-      }
     }
 
     return saved;
@@ -902,22 +904,23 @@ export class DesignerService {
       });
     }
 
-    const reviewerUser = await this.userRepo.findOneBy({ id: reviewerUserId });
-    if (reviewerUser?.role !== UserRole.GENERAL_MANAGER) {
-      const gmUsers = await this.userRepo.find({
-        where: { role: UserRole.GENERAL_MANAGER, is_active: true },
+    const ceoGmUsers = await this.userRepo.find({
+      where: [
+        { role: UserRole.CEO, is_active: true },
+        { role: UserRole.GENERAL_MANAGER, is_active: true },
+      ],
+    });
+    for (const leader of ceoGmUsers) {
+      if (leader.id === reviewerUserId) continue;
+      await this.createNotification({
+        user_id: leader.id,
+        from_user_id: reviewerUserId,
+        resource_id: saved.id,
+        resource_type: ResourceType.REVIEW,
+        parent_id: task.id,
+        parent_type: ParentType.DESIGNER_TASK,
+        type: `Designer review: ${reviewOutcome}`,
       });
-      for (const gm of gmUsers) {
-        await this.createNotification({
-          user_id: gm.id,
-          from_user_id: reviewerUserId,
-          resource_id: saved.id,
-          resource_type: ResourceType.REVIEW,
-          parent_id: task.id,
-          parent_type: ParentType.DESIGNER_TASK,
-          type: `Designer review: ${reviewOutcome}`,
-        });
-      }
     }
 
     return saved;

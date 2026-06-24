@@ -397,22 +397,23 @@ export class QuantitySurveyorService {
 
     await this.refreshResourceNotifications(id, userId);
 
-    const updaterUser = await this.userRepo.findOneBy({ id: userId });
-    if (updaterUser?.role !== UserRole.GENERAL_MANAGER) {
-      const gmUsers = await this.userRepo.find({
-        where: { role: UserRole.GENERAL_MANAGER, is_active: true },
+    const ceoGmUsers = await this.userRepo.find({
+      where: [
+        { role: UserRole.CEO, is_active: true },
+        { role: UserRole.GENERAL_MANAGER, is_active: true },
+      ],
+    });
+    for (const leader of ceoGmUsers) {
+      if (leader.id === userId) continue;
+      await this.createNotification({
+        user_id: leader.id,
+        from_user_id: userId,
+        resource_id: id,
+        resource_type: ResourceType.TASK_ASSIGNED,
+        parent_id: id,
+        parent_type: ParentType.QUANTITY_SURVEYOR_TASK,
+        type: "Quantity surveyor task updated",
       });
-      for (const gm of gmUsers) {
-        await this.createNotification({
-          user_id: gm.id,
-          from_user_id: userId,
-          resource_id: id,
-          resource_type: ResourceType.TASK_ASSIGNED,
-          parent_id: id,
-          parent_type: ParentType.QUANTITY_SURVEYOR_TASK,
-          type: "Quantity surveyor task updated",
-        });
-      }
     }
 
     return saved;
@@ -560,13 +561,6 @@ export class QuantitySurveyorService {
       throw new AppError(400, "Cannot review a submission for a deactivated task");
     }
 
-    const existingReview = await this.reviewRepo.findOneBy({
-      quantity_surveyor_submission_id: submissionId,
-    });
-    if (existingReview) {
-      throw new AppError(400, "A review already exists for this submission. Please update the existing review instead.");
-    }
-
     const review = new QuantitySurveyorReview();
     review.quantity_surveyor_submission_id = submissionId;
     review.reviewer_user_id = reviewerUserId;
@@ -597,22 +591,23 @@ export class QuantitySurveyorService {
       });
     }
 
-    const reviewerUser = await this.userRepo.findOneBy({ id: reviewerUserId });
-    if (reviewerUser?.role !== UserRole.GENERAL_MANAGER) {
-      const gmUsers = await this.userRepo.find({
-        where: { role: UserRole.GENERAL_MANAGER, is_active: true },
+    const ceoGmUsers = await this.userRepo.find({
+      where: [
+        { role: UserRole.CEO, is_active: true },
+        { role: UserRole.GENERAL_MANAGER, is_active: true },
+      ],
+    });
+    for (const leader of ceoGmUsers) {
+      if (leader.id === reviewerUserId) continue;
+      await this.createNotification({
+        user_id: leader.id,
+        from_user_id: reviewerUserId,
+        resource_id: saved.id,
+        resource_type: ResourceType.REVIEW,
+        parent_id: task.id,
+        parent_type: ParentType.QUANTITY_SURVEYOR_TASK,
+        type: `Quantity surveyor review: ${reviewOutcome}`,
       });
-      for (const gm of gmUsers) {
-        await this.createNotification({
-          user_id: gm.id,
-          from_user_id: reviewerUserId,
-          resource_id: saved.id,
-          resource_type: ResourceType.REVIEW,
-          parent_id: task.id,
-          parent_type: ParentType.QUANTITY_SURVEYOR_TASK,
-          type: `Quantity surveyor review: ${reviewOutcome}`,
-        });
-      }
     }
 
     return saved;

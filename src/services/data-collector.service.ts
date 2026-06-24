@@ -398,22 +398,23 @@ export class DataCollectorService {
 
     await this.refreshResourceNotifications(id, userId);
 
-    const updaterUser = await this.userRepo.findOneBy({ id: userId });
-    if (updaterUser?.role !== UserRole.GENERAL_MANAGER) {
-      const gmUsers = await this.userRepo.find({
-        where: { role: UserRole.GENERAL_MANAGER, is_active: true },
+    const ceoGmUsers = await this.userRepo.find({
+      where: [
+        { role: UserRole.CEO, is_active: true },
+        { role: UserRole.GENERAL_MANAGER, is_active: true },
+      ],
+    });
+    for (const leader of ceoGmUsers) {
+      if (leader.id === userId) continue;
+      await this.createNotification({
+        user_id: leader.id,
+        from_user_id: userId,
+        resource_id: id,
+        resource_type: ResourceType.TASK_ASSIGNED,
+        parent_id: id,
+        parent_type: ParentType.DATA_COLLECTOR_TASK,
+        type: "Data collector task updated",
       });
-      for (const gm of gmUsers) {
-        await this.createNotification({
-          user_id: gm.id,
-          from_user_id: userId,
-          resource_id: id,
-          resource_type: ResourceType.TASK_ASSIGNED,
-          parent_id: id,
-          parent_type: ParentType.DATA_COLLECTOR_TASK,
-          type: "Data collector task updated",
-        });
-      }
     }
 
     return saved;
@@ -561,13 +562,6 @@ export class DataCollectorService {
       throw new AppError(400, "Cannot review a submission for a deactivated task");
     }
 
-    const existingReview = await this.reviewRepo.findOneBy({
-      data_collector_submission_id: submissionId,
-    });
-    if (existingReview) {
-      throw new AppError(400, "A review already exists for this submission. Please update the existing review instead.");
-    }
-
     const review = new DataCollectorReview();
     review.data_collector_submission_id = submissionId;
     review.reviewer_user_id = reviewerUserId;
@@ -596,22 +590,23 @@ export class DataCollectorService {
       });
     }
 
-    const reviewerUser = await this.userRepo.findOneBy({ id: reviewerUserId });
-    if (reviewerUser?.role !== UserRole.GENERAL_MANAGER) {
-      const gmUsers = await this.userRepo.find({
-        where: { role: UserRole.GENERAL_MANAGER, is_active: true },
+    const ceoGmUsers = await this.userRepo.find({
+      where: [
+        { role: UserRole.CEO, is_active: true },
+        { role: UserRole.GENERAL_MANAGER, is_active: true },
+      ],
+    });
+    for (const leader of ceoGmUsers) {
+      if (leader.id === reviewerUserId) continue;
+      await this.createNotification({
+        user_id: leader.id,
+        from_user_id: reviewerUserId,
+        resource_id: saved.id,
+        resource_type: ResourceType.REVIEW,
+        parent_id: task.id,
+        parent_type: ParentType.DATA_COLLECTOR_TASK,
+        type: `Data collector review: ${reviewOutcome}`,
       });
-      for (const gm of gmUsers) {
-        await this.createNotification({
-          user_id: gm.id,
-          from_user_id: reviewerUserId,
-          resource_id: saved.id,
-          resource_type: ResourceType.REVIEW,
-          parent_id: task.id,
-          parent_type: ParentType.DATA_COLLECTOR_TASK,
-          type: `Data collector review: ${reviewOutcome}`,
-        });
-      }
     }
 
     return saved;
@@ -689,6 +684,37 @@ export class DataCollectorService {
     }
 
     await this.refreshResourceNotifications(reviewId, currentUserId);
+
+    if (task.assigned_to_user_id) {
+      await this.createNotification({
+        user_id: task.assigned_to_user_id,
+        from_user_id: currentUserId,
+        resource_id: reviewId,
+        resource_type: ResourceType.REVIEW,
+        parent_id: task.id,
+        parent_type: ParentType.DATA_COLLECTOR_TASK,
+        type: `Your submission review was updated to ${params.review_outcome || review.review_outcome}`,
+      });
+    }
+
+    const ceoGmUsers = await this.userRepo.find({
+      where: [
+        { role: UserRole.CEO, is_active: true },
+        { role: UserRole.GENERAL_MANAGER, is_active: true },
+      ],
+    });
+    for (const leader of ceoGmUsers) {
+      if (leader.id === currentUserId) continue;
+      await this.createNotification({
+        user_id: leader.id,
+        from_user_id: currentUserId,
+        resource_id: reviewId,
+        resource_type: ResourceType.REVIEW,
+        parent_id: task.id,
+        parent_type: ParentType.DATA_COLLECTOR_TASK,
+        type: `Data collector review updated to ${params.review_outcome || review.review_outcome}`,
+      });
+    }
 
     return saved;
   }

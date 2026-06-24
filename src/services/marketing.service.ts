@@ -614,13 +614,6 @@ export class MarketingService {
       throw new AppError(400, "Cannot review a submission for a deactivated task");
     }
 
-    const existingReview = await this.reviewRepo.findOneBy({
-      marketing_submission_id: submissionId,
-    });
-    if (existingReview) {
-      throw new AppError(400, "A review already exists for this submission. Please update the existing review instead.");
-    }
-
     const review = new MarketingReview();
     review.marketing_submission_id = submissionId;
     review.reviewer_user_id = reviewerUserId;
