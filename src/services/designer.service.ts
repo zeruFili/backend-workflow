@@ -509,6 +509,28 @@ export class DesignerService {
 
     const saved = await this.taskRepo.save(task);
 
+    // Notify CEO and General Manager (unless they are the creator)
+    const ceoGmUsers = await this.userRepo.find({
+      where: [
+        { role: UserRole.CEO, is_active: true },
+        { role: UserRole.GENERAL_MANAGER, is_active: true },
+      ],
+    });
+
+    for (const leader of ceoGmUsers) {
+      if (leader.id === assignedByUserId) continue;
+      await this.createNotification({
+        user_id: leader.id,
+        from_user_id: assignedByUserId,
+        resource_id: saved.id,
+        resource_type: ResourceType.POSTED_JOB,
+        parent_id: saved.id,
+        parent_type: ParentType.DESIGNER_TASK,
+        type: "New designer task created",
+      });
+    }
+
+    // Notify all active designers if the task is public and unassigned
     if (saved.is_public && !saved.assigned_to_user_id) {
       const designers = await this.userRepo.find({
         where: { role: UserRole.DESIGNER, is_active: true },
