@@ -135,6 +135,9 @@ export class DesignerController {
       if (bodyForValidation.story_point !== undefined) {
         bodyForValidation.story_point = parseInt(bodyForValidation.story_point as any, 10);
       }
+      if (bodyForValidation.is_public !== undefined) {
+        bodyForValidation.is_public = bodyForValidation.is_public === 'true' || bodyForValidation.is_public === true;
+      }
       const dto = await validateDto(UpdateDesignerTaskDto, bodyForValidation, req);
 
       const filePaths = getFilePathsFromRequest(req, "designer_tasks");

@@ -1,4 +1,4 @@
-import { In } from "typeorm";
+import { In, Not } from "typeorm";
 import { AppDataSource } from "../config/data-source";
 import { DesignerTask } from "../entities/DesignerTask";
 import { DesignerApplication } from "../entities/DesignerApplication";
@@ -112,10 +112,12 @@ export class DesignerService {
     return this.notificationRepo.save(n);
   }
 
-  private async refreshResourceNotifications(resourceId: string, fromUserId: string) {
-    const notifications = await this.notificationRepo.find({
-      where: { resource_id: resourceId },
-    });
+  private async refreshResourceNotifications(resourceId: string, fromUserId: string, excludeTypes?: ResourceType[]) {
+    const query: any = { resource_id: resourceId };
+    if (excludeTypes && excludeTypes.length > 0) {
+      query.resource_type = Not(In(excludeTypes));
+    }
+    const notifications = await this.notificationRepo.find({ where: query });
 
     for (const n of notifications) {
       n.viewed = false;
@@ -585,6 +587,7 @@ export class DesignerService {
     }
 
     const previousAssignee = task.assigned_to_user_id;
+    const previousIsPublic = task.is_public;
 
     if (params.title !== undefined) task.title = params.title;
     if (params.description !== undefined) task.description = params.description;
@@ -603,24 +606,71 @@ export class DesignerService {
 
     const saved = await this.taskRepo.save(task);
 
+    await this.refreshResourceNotifications(id, currentUser.id, [ResourceType.POSTED_JOB]);
+
+    // Handle is_public changes
+    if (params.is_public !== undefined && params.is_public !== previousIsPublic) {
+      if (params.is_public && !saved.assigned_to_user_id) {
+        // Task changed to Public → notify all active designers
+        const designers = await this.userRepo.find({
+          where: { role: UserRole.DESIGNER, is_active: true },
+        });
+        for (const designer of designers) {
+          await this.createNotification({
+            user_id: designer.id,
+            from_user_id: currentUser.id,
+            resource_id: saved.id,
+            resource_type: ResourceType.POSTED_JOB,
+            parent_id: saved.id,
+            parent_type: ParentType.DESIGNER_TASK,
+            type: "New public designer task available",
+          });
+        }
+      } else {
+        // Task changed to Not Public → clear Designer-specific public-task notifications
+        const designerUsers = await this.userRepo.find({
+          where: { role: UserRole.DESIGNER, is_active: true },
+          select: ["id"],
+        });
+        if (designerUsers.length > 0) {
+          const designerIds = designerUsers.map((d) => d.id);
+          await this.notificationRepo.update(
+            {
+              user_id: In(designerIds),
+              parent_id: id,
+              resource_type: ResourceType.POSTED_JOB,
+              viewed: false,
+            },
+            { viewed: true }
+          );
+        }
+      }
+    }
+
     if (
       params.assigned_to_user_id !== undefined &&
       params.assigned_to_user_id !== previousAssignee &&
       params.assigned_to_user_id
     ) {
       await this.notifyTaskAssignment(saved.id, params.assigned_to_user_id, currentUser.id);
-      // Clear public-task notifications since the task is now assigned
-      await this.notificationRepo.update(
-        {
-          parent_id: id,
-          resource_type: ResourceType.POSTED_JOB,
-          viewed: false,
-        },
-        { viewed: true }
-      );
+      // Clear Designer-specific public-task notifications since the task is now assigned
+      const designerUsers = await this.userRepo.find({
+        where: { role: UserRole.DESIGNER, is_active: true },
+        select: ["id"],
+      });
+      if (designerUsers.length > 0) {
+        const designerIds = designerUsers.map((d) => d.id);
+        await this.notificationRepo.update(
+          {
+            user_id: In(designerIds),
+            parent_id: id,
+            resource_type: ResourceType.POSTED_JOB,
+            viewed: false,
+          },
+          { viewed: true }
+        );
+      }
     }
-
-    await this.refreshResourceNotifications(id, currentUser.id);
 
     const ceoGmUsers = await this.userRepo.find({
       where: [
@@ -698,15 +748,23 @@ export class DesignerService {
 
     await this.notifyTaskAssignment(taskId, designerUserId, assignedByUserId);
 
-    // Clear public-task notifications for designers since the task is now assigned
-    await this.notificationRepo.update(
-      {
-        parent_id: taskId,
-        resource_type: ResourceType.POSTED_JOB,
-        viewed: false,
-      },
-      { viewed: true }
-    );
+    // Clear Designer-specific public-task notifications since the task is now assigned
+    const designerUsers = await this.userRepo.find({
+      where: { role: UserRole.DESIGNER, is_active: true },
+      select: ["id"],
+    });
+    if (designerUsers.length > 0) {
+      const designerIds = designerUsers.map((d) => d.id);
+      await this.notificationRepo.update(
+        {
+          user_id: In(designerIds),
+          parent_id: taskId,
+          resource_type: ResourceType.POSTED_JOB,
+          viewed: false,
+        },
+        { viewed: true }
+      );
+    }
 
     return task;
   }
