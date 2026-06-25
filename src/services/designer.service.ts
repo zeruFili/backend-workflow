@@ -609,6 +609,15 @@ export class DesignerService {
       params.assigned_to_user_id
     ) {
       await this.notifyTaskAssignment(saved.id, params.assigned_to_user_id, currentUser.id);
+      // Clear public-task notifications since the task is now assigned
+      await this.notificationRepo.update(
+        {
+          parent_id: id,
+          resource_type: ResourceType.POSTED_JOB,
+          viewed: false,
+        },
+        { viewed: true }
+      );
     }
 
     await this.refreshResourceNotifications(id, currentUser.id);
@@ -688,6 +697,16 @@ export class DesignerService {
     }
 
     await this.notifyTaskAssignment(taskId, designerUserId, assignedByUserId);
+
+    // Clear public-task notifications for designers since the task is now assigned
+    await this.notificationRepo.update(
+      {
+        parent_id: taskId,
+        resource_type: ResourceType.POSTED_JOB,
+        viewed: false,
+      },
+      { viewed: true }
+    );
 
     return task;
   }
