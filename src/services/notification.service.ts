@@ -61,18 +61,38 @@ export class NotificationService {
   }
 
   async markRead(notificationId: string, userId: string) {
-    const notification = await this.repo.findOne({
-      where: { id: notificationId, user_id: userId } as any,
-    });
+  const timestamp = new Date().toISOString();
+  console.log(`[${timestamp}] [markRead] RECEIVED - notificationId: ${notificationId}, userId: ${userId}`);
+  
+  const notification = await this.repo.findOne({
+    where: { id: notificationId, user_id: userId } as any,
+  });
 
-    if (!notification) {
-      throw new AppError(404, "Notification not found");
-    }
-
-    notification.viewed = true;
-    notification.updated_at = new Date();
-    return this.repo.save(notification);
+  if (!notification) {
+    console.log(`[${timestamp}] [markRead] NOT FOUND - notificationId: ${notificationId}, userId: ${userId}`);
+    throw new AppError(404, "Notification not found");
   }
+
+  console.log(`[${timestamp}] [markRead] FOUND - Notification details:`, JSON.stringify({
+    id: notification.id,
+    viewed_before: notification.viewed,
+    user_id: notification.user_id,
+    created_at: notification.created_at
+  }));
+
+  notification.viewed = true;
+  notification.updated_at = new Date();
+  
+  const updatedNotification = await this.repo.save(notification);
+  
+  console.log(`[${timestamp}] [markRead] SUCCESS - Updated notification ID: ${notificationId}`, JSON.stringify({
+    id: updatedNotification.id,
+    viewed: updatedNotification.viewed,
+    updated_at: updatedNotification.updated_at
+  }));
+  
+  return updatedNotification;
+}
 
   async markMultipleRead(ids: string[], userId: string) {
     const notifications = await this.repo
