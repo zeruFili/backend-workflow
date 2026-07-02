@@ -11,5 +11,6 @@ router.patch("/notifications/:id/read", (req, res) => notificationController.mar
 router.patch("/notifications/read-all", (req, res) => notificationController.markAllRead(req, res));
 router.patch("/notifications/bulk-read", (req, res) => notificationController.markMultipleRead(req, res));
 router.get("/notifications/unread-count", (req, res) => notificationController.getUnreadCount(req, res));
+router.get("/notifications/unread-counts", (req, res) => notificationController.getUnreadCounts(req, res));
 
 export default router;

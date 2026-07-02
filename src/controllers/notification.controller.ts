@@ -39,6 +39,24 @@ export class NotificationController {
     }
   }
 
+  async getUnreadCounts(req: AuthRequest, res: Response): Promise<void> {
+    try {
+      const userId = req.user!.id;
+      const role = req.user!.role;
+      const parentTypesParam = req.query.parentType as string | undefined;
+      const parentTypes = parentTypesParam ? parentTypesParam.split(",") : undefined;
+      const result = await notificationService.getUnreadCounts(userId, role, parentTypes);
+      res.json(result);
+    } catch (err) {
+      if (err instanceof AppError) {
+        res.status(err.statusCode).json({ success: false, message: err.message });
+        return;
+      }
+      console.error("getUnreadCounts error:", err);
+      res.status(500).json({ success: false, message: "Internal server error" });
+    }
+  }
+
   async markRead(req: AuthRequest, res: Response): Promise<void> {
     try {
       const notificationId = req.params.id as string;

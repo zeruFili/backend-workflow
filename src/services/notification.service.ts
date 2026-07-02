@@ -4,6 +4,7 @@ import { ResourceType } from "../enums/resource-type.enum";
 import { ParentType } from "../enums/parent-type.enum";
 import { AppError } from "../middlewares/error.middleware";
 import { pickSafeUserFields } from "../utils/response.utils";
+import { ROLE_RESOURCE_FILTERS, toCamelKey } from "../constants/role-resource-filters";
 
 export class NotificationService {
   private repo = AppDataSource.getRepository(Notification);
@@ -58,6 +59,29 @@ export class NotificationService {
     });
 
     return { total: count };
+  }
+
+  async getUnreadCounts(userId: string, role: string, parentTypes?: string[]) {
+    const domains = parentTypes ?? Object.keys(ROLE_RESOURCE_FILTERS);
+    const results: Record<string, number> = {};
+
+    for (const domain of domains) {
+      const resourceTypes = ROLE_RESOURCE_FILTERS[domain]?.[role];
+      if (!resourceTypes || resourceTypes.length === 0) continue;
+
+      const result = await this.repo
+        .createQueryBuilder("n")
+        .select("COUNT(DISTINCT n.parent_id)", "count")
+        .where("n.user_id = :userId", { userId })
+        .andWhere("n.viewed = false")
+        .andWhere("n.parent_type = :domain", { domain })
+        .andWhere("n.resource_type IN (:...resourceTypes)", { resourceTypes })
+        .getRawOne();
+
+      results[toCamelKey(domain)] = Number(result?.count ?? 0);
+    }
+
+    return results;
   }
 
   async markRead(notificationId: string, userId: string) {
