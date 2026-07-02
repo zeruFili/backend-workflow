@@ -45,7 +45,9 @@ export class NotificationController {
       const role = req.user!.role;
       const parentTypesParam = req.query.parentType as string | undefined;
       const parentTypes = parentTypesParam ? parentTypesParam.split(",") : undefined;
+      console.log(`[getUnreadCounts] Request — userId=${userId} role=${role} parentTypes=${parentTypesParam ?? "all"}`);
       const result = await notificationService.getUnreadCounts(userId, role, parentTypes);
+      console.log(`[getUnreadCounts] Response —`, JSON.stringify(result));
       res.json(result);
     } catch (err) {
       if (err instanceof AppError) {

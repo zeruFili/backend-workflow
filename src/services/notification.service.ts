@@ -67,7 +67,12 @@ export class NotificationService {
 
     for (const domain of domains) {
       const resourceTypes = ROLE_RESOURCE_FILTERS[domain]?.[role];
-      if (!resourceTypes || resourceTypes.length === 0) continue;
+      if (!resourceTypes || resourceTypes.length === 0) {
+        console.log(`  [getUnreadCounts] Skipping domain=${domain} — no resource_types for role=${role}`);
+        continue;
+      }
+
+      console.log(`  [getUnreadCounts] Querying domain=${domain} resourceTypes=[${resourceTypes.join(",")}]`);
 
       const result = await this.repo
         .createQueryBuilder("n")
@@ -79,8 +84,10 @@ export class NotificationService {
         .getRawOne();
 
       results[toCamelKey(domain)] = Number(result?.count ?? 0);
+      console.log(`  [getUnreadCounts] domain=${domain} → ${toCamelKey(domain)}=${results[toCamelKey(domain)]}`);
     }
 
+    console.log(`[getUnreadCounts] Final result:`, JSON.stringify(results));
     return results;
   }
 

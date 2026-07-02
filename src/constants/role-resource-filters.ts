@@ -26,5 +26,5 @@ export const ROLE_RESOURCE_FILTERS: Record<string, Record<string, ResourceType[]
 };
 
 export function toCamelKey(snakeKey: string): string {
-  return snakeKey.replace(/_([a-z])/g, (_: string, c: string) => c.toUpperCase());
+  return snakeKey.replace(/_([a-z])/g, (_: string, c: string) => c.toUpperCase()) + "s";
 }
