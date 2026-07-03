@@ -20,8 +20,8 @@ export const ROLE_RESOURCE_FILTERS: Record<string, Record<string, ResourceType[]
   },
   [ParentType.DESIGNER_TASK]: {
     [UserRole.DESIGNER]: [ResourceType.POSTED_JOB],
-    [UserRole.GENERAL_MANAGER]: [ResourceType.POSTED_JOB],
-    [UserRole.CEO]: [ResourceType.POSTED_JOB],
+    [UserRole.GENERAL_MANAGER]: [ResourceType.SUBMISSION, ResourceType.REVIEW],
+    [UserRole.CEO]: [ResourceType.SUBMISSION, ResourceType.REVIEW],
   },
 };
 
