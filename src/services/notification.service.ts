@@ -31,11 +31,11 @@ export class NotificationService {
     return this.repo.save(notification);
   }
 
-  async getUserNotifications(userId: string, page: number, limit: number) {
+  async getUserNotifications(userId: string, page: number, limit: number, viewed?: boolean) {
     const skip = (page - 1) * limit;
 
     const [data, total] = await this.repo.findAndCount({
-      where: { user_id: userId } as any,
+      where: { user_id: userId, ...(viewed !== undefined ? { viewed } : {}) } as any,
       relations: ["from_user"],
       order: { created_at: "DESC" },
       skip,
