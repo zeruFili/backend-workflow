@@ -650,6 +650,13 @@ export class DesignerService {
       params.assigned_to_user_id !== previousAssignee &&
       params.assigned_to_user_id
     ) {
+      if (previousAssignee) {
+        await this.notificationRepo.delete({
+          parent_id: id,
+          resource_type: ResourceType.TASK_ASSIGNED,
+          user_id: previousAssignee,
+        });
+      }
       await this.notifyTaskAssignment(saved.id, params.assigned_to_user_id, currentUser.id);
       // Clear Designer-specific public-task notifications since the task is now assigned
       const designerUsers = await this.userRepo.find({
@@ -697,6 +704,7 @@ export class DesignerService {
     if (!task) throw new AppError(404, "Designer task not found");
 
     const isReassignment = !!task.assigned_to_user_id;
+    const previousAssigneeId = task.assigned_to_user_id;
 
     if (isReassignment) {
       const submissionCount = await this.submissionRepo.count({
@@ -720,6 +728,14 @@ export class DesignerService {
             "Cannot reassign: the 2-day editing window has expired. Task updates are no longer allowed after 2 days from assignment."
           );
         }
+      }
+
+      if (previousAssigneeId) {
+        await this.notificationRepo.delete({
+          parent_id: taskId,
+          resource_type: ResourceType.TASK_ASSIGNED,
+          user_id: previousAssigneeId,
+        });
       }
     }
 
