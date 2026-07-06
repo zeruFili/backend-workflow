@@ -696,7 +696,12 @@ export class DesignerService {
       });
     }
 
-    return saved;
+    const enriched = await this.taskRepo.findOne({
+      where: { id },
+      relations: ["assigned_to_user", "assigned_by_user", "updated_by_user"],
+    });
+    if (!enriched) throw new AppError(404, "Designer task not found after update");
+    return this.sanitizeDesignerTask(enriched);
   }
 
   async assignDesigner(taskId: string, designerUserId: string, assignedByUserId: string) {
@@ -780,7 +785,12 @@ export class DesignerService {
       );
     }
 
-    return task;
+    const saved = await this.taskRepo.findOne({
+      where: { id: taskId },
+      relations: ["assigned_to_user", "assigned_by_user", "updated_by_user"],
+    });
+    if (!saved) throw new AppError(404, "Designer task not found after update");
+    return saved;
   }
 
   async apply(taskId: string, applicantUserId: string, coverNote?: string) {
