@@ -1418,6 +1418,86 @@ export class DesignerService {
 
     return task;
   }
+
+  async deactivateTask(taskId: string, userId: string): Promise<DesignerTask> {
+    const task = await this.taskRepo.findOne({ where: { id: taskId } });
+    if (!task) {
+      throw new AppError(404, "Designer task not found");
+    }
+    if (task.task_state === TaskState.DEACTIVE) {
+      throw new AppError(400, "Task is already deactivated");
+    }
+    task.task_state = TaskState.DEACTIVE;
+    task.updated_by = userId as any;
+    task.updated_at = new Date();
+    const saved = await this.taskRepo.save(task);
+
+    const updated = await this.taskRepo.findOne({
+      where: { id: taskId },
+      relations: ["assigned_to_user", "assigned_by_user", "updated_by_user"],
+    });
+    if (!updated) throw new AppError(404, "Designer task not found");
+
+    const taskIds = [updated.id];
+    const submissionsByTask = await this.batchSubmissionsWithReviews(taskIds, userId);
+    const taskReviews = await this.batchTaskReviews(taskIds);
+
+    const swr = submissionsByTask[updated.id] || { taskNotification: { hasNotification: false, notificationId: null }, caseStudy: [], designing: [], rendering: [], finalStage: [] };
+    const { taskNotification, ...restSwr } = swr;
+    const hasNestedNotification =
+      swr.caseStudy?.some((s: any) => s.hasNotification || (s.reviews || []).some((r: any) => r.hasNotification)) ||
+      swr.designing?.some((s: any) => s.hasNotification || (s.reviews || []).some((r: any) => r.hasNotification)) ||
+      swr.rendering?.some((s: any) => s.hasNotification || (s.reviews || []).some((r: any) => r.hasNotification)) ||
+      swr.finalStage?.some((s: any) => s.hasNotification || (s.reviews || []).some((r: any) => r.hasNotification));
+
+    return {
+      ...this.sanitizeDesignerTask(updated),
+      taskNotification,
+      submissionsWithReviews: restSwr,
+      hasNestedNotification,
+      taskReview: taskReviews[updated.id] || null,
+    } as any;
+  }
+
+  async reactivateTask(taskId: string, userId: string): Promise<DesignerTask> {
+    const task = await this.taskRepo.findOne({ where: { id: taskId } });
+    if (!task) {
+      throw new AppError(404, "Designer task not found");
+    }
+    if (task.task_state === TaskState.ACTIVE) {
+      throw new AppError(400, "Task is already active");
+    }
+    task.task_state = TaskState.ACTIVE;
+    task.updated_by = userId as any;
+    task.updated_at = new Date();
+    const saved = await this.taskRepo.save(task);
+
+    const updated = await this.taskRepo.findOne({
+      where: { id: taskId },
+      relations: ["assigned_to_user", "assigned_by_user", "updated_by_user"],
+    });
+    if (!updated) throw new AppError(404, "Designer task not found");
+
+    const taskIds = [updated.id];
+    const submissionsByTask = await this.batchSubmissionsWithReviews(taskIds, userId);
+    const taskReviews = await this.batchTaskReviews(taskIds);
+
+    const swr = submissionsByTask[updated.id] || { taskNotification: { hasNotification: false, notificationId: null }, caseStudy: [], designing: [], rendering: [], finalStage: [] };
+    const { taskNotification, ...restSwr } = swr;
+    const hasNestedNotification =
+      swr.caseStudy?.some((s: any) => s.hasNotification || (s.reviews || []).some((r: any) => r.hasNotification)) ||
+      swr.designing?.some((s: any) => s.hasNotification || (s.reviews || []).some((r: any) => r.hasNotification)) ||
+      swr.rendering?.some((s: any) => s.hasNotification || (s.reviews || []).some((r: any) => r.hasNotification)) ||
+      swr.finalStage?.some((s: any) => s.hasNotification || (s.reviews || []).some((r: any) => r.hasNotification));
+
+    return {
+      ...this.sanitizeDesignerTask(updated),
+      taskNotification,
+      submissionsWithReviews: restSwr,
+      hasNestedNotification,
+      taskReview: taskReviews[updated.id] || null,
+    } as any;
+  }
 }
 
 export const designerService = new DesignerService();

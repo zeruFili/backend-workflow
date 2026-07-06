@@ -59,5 +59,7 @@ router.patch("/designer-task-reviews/:id", authenticate, authorize(UserRole.CEO,
 router.post("/designer-tasks/:id/pause", authenticate, authorize(UserRole.DESIGNER), (req, res, next) => designerController.pauseTask(req, res, next));
 router.post("/designer-tasks/:id/resume", authenticate, authorize(UserRole.DESIGNER), (req, res, next) => designerController.resumeTask(req, res, next));
 router.delete("/designer-tasks/:id", authenticate, authorize(UserRole.CEO), (req, res, next) => designerController.removeTask(req, res, next));
+router.post("/designer-tasks/:id/deactivate", authenticate, authorize(UserRole.CEO, UserRole.GENERAL_MANAGER), (req, res, next) => designerController.deactivateTask(req, res, next));
+router.post("/designer-tasks/:id/reactivate", authenticate, authorize(UserRole.CEO, UserRole.GENERAL_MANAGER), (req, res, next) => designerController.reactivateTask(req, res, next));
 
 export default router;

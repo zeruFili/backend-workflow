@@ -433,6 +433,36 @@ export class DesignerController {
       next(error);
     }
   }
+
+  async deactivateTask(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      if (!req.user) {
+        res.status(401).json({ success: false, message: "Unauthorized" });
+        return;
+      }
+
+      const taskId = req.params.id as string;
+      const task = await designerService.deactivateTask(taskId, req.user.id);
+      res.status(200).json({ success: true, data: task, message: "Task deactivated successfully" });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async reactivateTask(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      if (!req.user) {
+        res.status(401).json({ success: false, message: "Unauthorized" });
+        return;
+      }
+
+      const taskId = req.params.id as string;
+      const task = await designerService.reactivateTask(taskId, req.user.id);
+      res.status(200).json({ success: true, data: task, message: "Task reactivated successfully" });
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 export const designerController = new DesignerController();
