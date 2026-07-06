@@ -4,7 +4,7 @@ import { ResourceType } from "../enums/resource-type.enum";
 import { ParentType } from "../enums/parent-type.enum";
 import { AppError } from "../middlewares/error.middleware";
 import { pickSafeUserFields } from "../utils/response.utils";
-import { ROLE_RESOURCE_FILTERS, toCamelKey } from "../constants/role-resource-filters";
+import { ROLE_RESOURCE_FILTERS } from "../constants/role-resource-filters";
 
 export class NotificationService {
   private repo = AppDataSource.getRepository(Notification);
@@ -62,29 +62,35 @@ export class NotificationService {
   }
 
   async getUnreadCounts(userId: string, role: string, parentTypes?: string[]) {
-    const domains = parentTypes ?? Object.keys(ROLE_RESOURCE_FILTERS);
+    const domainKeys = parentTypes ?? Object.keys(ROLE_RESOURCE_FILTERS);
     const results: Record<string, number> = {};
 
-    for (const domain of domains) {
-      const resourceTypes = ROLE_RESOURCE_FILTERS[domain]?.[role];
+    for (const key of domainKeys) {
+      const config = ROLE_RESOURCE_FILTERS[key];
+      if (!config) continue;
+
+      const resourceTypes = config.filters[role];
       if (!resourceTypes || resourceTypes.length === 0) {
-        console.log(`  [getUnreadCounts] Skipping domain=${domain} — no resource_types for role=${role}`);
+        console.log(`  [getUnreadCounts] Skipping key=${key} — no resource_types for role=${role}`);
         continue;
       }
 
-      console.log(`  [getUnreadCounts] Querying domain=${domain} resourceTypes=[${resourceTypes.join(",")}]`);
+      console.log(`  [getUnreadCounts] Querying key=${key} parentType=${config.parentType} resourceTypes=[${resourceTypes.join(",")}]`);
 
-      const result = await this.repo
+      // Fetch distinct parent_ids for logging
+      const parentIds = await this.repo
         .createQueryBuilder("n")
-        .select("COUNT(DISTINCT n.parent_id)", "count")
+        .select("DISTINCT n.parent_id", "parent_id")
         .where("n.user_id = :userId", { userId })
         .andWhere("n.viewed = false")
-        .andWhere("n.parent_type = :domain", { domain })
+        .andWhere("n.parent_type = :domain", { domain: config.parentType })
         .andWhere("n.resource_type IN (:...resourceTypes)", { resourceTypes })
-        .getRawOne();
+        .getRawMany();
 
-      results[toCamelKey(domain)] = Number(result?.count ?? 0);
-      console.log(`  [getUnreadCounts] domain=${domain} → ${toCamelKey(domain)}=${results[toCamelKey(domain)]}`);
+      const ids = parentIds.map((r: any) => r.parent_id);
+      console.log(`  [getUnreadCounts] key=${key} parent_ids=[${ids.join(", ") || "(none)"}] count=${ids.length}`);
+
+      results[key] = ids.length;
     }
 
     console.log(`[getUnreadCounts] Final result:`, JSON.stringify(results));

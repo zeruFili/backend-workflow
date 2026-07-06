@@ -213,8 +213,6 @@ export class DesignerService {
 
     this.applyTaskListVisibilityScope(qb, currentUser);
 
-    qb.andWhere("t.task_state = :activeState", { activeState: TaskState.ACTIVE });
-
     if (status) qb.andWhere("t.status = :status", { status });
     if (assignedTo === null) {
       qb.andWhere("t.assigned_to_user_id IS NULL");
