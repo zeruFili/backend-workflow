@@ -239,18 +239,23 @@ export class DesignerService {
 
     // Batch-fetch task-level reviews (ratings)
     const taskReviews = await this.batchTaskReviews(taskIds);
+    const appTimestamps = await this.batchLatestApplicationTimestamps(taskIds);
 
-    // Sort by latest activity (task, submission, or review timestamps) descending
+    // Sort by latest activity (task, submission, review, application, or assignment timestamps) descending
     data.sort((a, b) => {
       const aTs = Math.max(
         a.created_at.getTime(),
         a.updated_at?.getTime() ?? 0,
-        submissionsByTask[a.id]?.latestActivityTs ?? 0
+        a.assigned_at?.getTime() ?? 0,
+        submissionsByTask[a.id]?.latestActivityTs ?? 0,
+        appTimestamps[a.id] ?? 0
       );
       const bTs = Math.max(
         b.created_at.getTime(),
         b.updated_at?.getTime() ?? 0,
-        submissionsByTask[b.id]?.latestActivityTs ?? 0
+        b.assigned_at?.getTime() ?? 0,
+        submissionsByTask[b.id]?.latestActivityTs ?? 0,
+        appTimestamps[b.id] ?? 0
       );
       return bTs - aTs;
     });
@@ -448,6 +453,27 @@ export class DesignerService {
         submittedAt: review.created_at?.toISOString() ?? null,
         updatedAt: review.updated_at?.toISOString() ?? null,
       };
+    }
+    return result;
+  }
+
+  private async batchLatestApplicationTimestamps(taskIds: string[]): Promise<Record<string, number>> {
+    if (taskIds.length === 0) return {};
+
+    const apps = await this.applicationRepo
+      .createQueryBuilder("a")
+      .select("a.designer_task_id", "task_id")
+      .addSelect("GREATEST(a.created_at, COALESCE(a.updated_at, a.created_at))", "latest_ts")
+      .where("a.designer_task_id IN (:...taskIds)", { taskIds })
+      .getRawMany<{ task_id: string; latest_ts: Date }>();
+
+    const result: Record<string, number> = {};
+    for (const row of apps) {
+      const ts = new Date(row.latest_ts).getTime();
+      const cur = result[row.task_id];
+      if (cur === undefined || ts > cur) {
+        result[row.task_id] = ts;
+      }
     }
     return result;
   }
