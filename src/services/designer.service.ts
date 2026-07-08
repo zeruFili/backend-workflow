@@ -470,6 +470,7 @@ export class DesignerService {
       .select("a.designer_task_id", "task_id")
       .addSelect("GREATEST(a.created_at, COALESCE(a.updated_at, a.created_at))", "latest_ts")
       .where("a.designer_task_id IN (:...taskIds)", { taskIds })
+      .andWhere("a.is_withdrawn = false")
       .getRawMany<{ task_id: string; latest_ts: Date }>();
 
     const result: Record<string, number> = {};
@@ -487,7 +488,7 @@ export class DesignerService {
     if (taskIds.length === 0) return {};
 
     const apps = await this.applicationRepo.find({
-      where: taskIds.map((id) => ({ designer_task_id: id, applicant_user_id: userId } as any)),
+      where: taskIds.map((id) => ({ designer_task_id: id, applicant_user_id: userId, is_withdrawn: false } as any)),
     });
 
     const result: Record<string, boolean> = {};
@@ -878,6 +879,31 @@ export class DesignerService {
       where: { designer_task_id: taskId, applicant_user_id: applicantUserId },
     });
     if (existing) {
+      if (existing.is_withdrawn) {
+        existing.is_withdrawn = false;
+        existing.cover_note = coverNote ?? existing.cover_note;
+        existing.updated_at = new Date();
+        const saved = await this.applicationRepo.save(existing);
+
+        const ceoGm = await this.userRepo.find({
+          where: [
+            { role: UserRole.CEO, is_active: true },
+            { role: UserRole.GENERAL_MANAGER, is_active: true },
+          ],
+        });
+        for (const reviewer of ceoGm) {
+          await this.createNotification({
+            user_id: reviewer.id,
+            from_user_id: applicantUserId,
+            resource_id: saved.id,
+            resource_type: ResourceType.APPLY,
+            parent_id: taskId,
+            parent_type: ParentType.DESIGNER_TASK,
+            type: "New designer application submitted",
+          });
+        }
+        return saved;
+      }
       throw new AppError(409, "You have already applied for this task");
     }
 
@@ -910,6 +936,42 @@ export class DesignerService {
     return saved;
   }
 
+  async withdrawApplication(taskId: string, applicantUserId: string) {
+    console.log('[DesignerService.withdrawApplication] ========== WITHDRAW APPLICATION ==========');
+    console.log('[DesignerService.withdrawApplication] Task ID:', taskId);
+    console.log('[DesignerService.withdrawApplication] Applicant user ID:', applicantUserId);
+
+    const application = await this.applicationRepo.findOne({
+      where: { designer_task_id: taskId, applicant_user_id: applicantUserId },
+    });
+    console.log('[DesignerService.withdrawApplication] Application found:', application ? `yes (id=${application.id}, is_withdrawn=${application.is_withdrawn})` : 'NO');
+    if (!application) {
+      console.log('[DesignerService.withdrawApplication] ERROR: Application not found');
+      throw new AppError(404, "Application not found");
+    }
+    if (application.is_withdrawn) {
+      console.log('[DesignerService.withdrawApplication] ERROR: Application already withdrawn');
+      throw new AppError(400, "Application is already withdrawn");
+    }
+
+    application.is_withdrawn = true;
+    application.updated_at = new Date();
+    console.log('[DesignerService.withdrawApplication] Marking as withdrawn, updated_at:', application.updated_at);
+    const saved = await this.applicationRepo.save(application);
+    console.log('[DesignerService.withdrawApplication] Saved successfully, is_withdrawn:', saved.is_withdrawn);
+
+    const deleteResult = await this.notificationRepo.delete({
+      resource_type: ResourceType.APPLY,
+      parent_id: taskId,
+      from_user_id: applicantUserId,
+      viewed: false,
+    });
+    console.log('[DesignerService.withdrawApplication] Notifications deleted:', deleteResult.affected);
+
+    console.log('[DesignerService.withdrawApplication] ========== WITHDRAW COMPLETE ==========');
+    return saved;
+  }
+
   async listApplications(params: ApplicationListParams) {
     const { page, limit, taskId, applicantId, currentUser } = params;
 
@@ -933,6 +995,7 @@ export class DesignerService {
     const sanitized = data.map((a) => ({
       ...a,
       applicant_user: this.summarizeApplicantUser((a as any).applicant_user),
+      is_withdrawn: a.is_withdrawn,
     }));
 
     return {

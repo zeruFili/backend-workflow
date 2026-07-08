@@ -33,4 +33,7 @@ export class DesignerApplication {
 
   @Column({ type: "timestamptz", nullable: true })
   updated_at: Date;
+
+  @Column({ type: "boolean", default: false })
+  is_withdrawn: boolean;
 }

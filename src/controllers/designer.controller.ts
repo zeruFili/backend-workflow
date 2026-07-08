@@ -214,6 +214,29 @@ export class DesignerController {
     }
   }
 
+  async withdrawApplication(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      console.log('[DesignerController.withdrawApplication] ========== REQUEST RECEIVED ==========');
+      console.log('[DesignerController.withdrawApplication] Params:', req.params);
+      console.log('[DesignerController.withdrawApplication] User:', req.user ? { id: req.user.id, role: req.user.role } : 'NONE');
+
+      if (!req.user) {
+        console.log('[DesignerController.withdrawApplication] ERROR: No authenticated user');
+        res.status(401).json({ success: false, message: "Unauthorized" });
+        return;
+      }
+
+      const taskId = req.params.id as string;
+      console.log('[DesignerController.withdrawApplication] Calling service with taskId:', taskId, 'userId:', req.user.id);
+      const application = await designerService.withdrawApplication(taskId, req.user.id);
+      console.log('[DesignerController.withdrawApplication] Service returned:', application.id, 'is_withdrawn:', application.is_withdrawn);
+      res.status(200).json({ success: true, data: application, message: "Application withdrawn successfully" });
+    } catch (error) {
+      console.log('[DesignerController.withdrawApplication] ERROR caught:', (error as any)?.message || error);
+      next(error);
+    }
+  }
+
   async listApplications(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
       if (!req.user) {

@@ -6,4 +6,5 @@ export enum ResourceType {
   APPLY = "apply",
   PAUSED = "paused",
   RATE = "rate",
+  WITHDRAW = "withdraw",
 }

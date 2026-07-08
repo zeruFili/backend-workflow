@@ -35,6 +35,12 @@ router.post(
   requireExactRole(UserRole.DESIGNER, "Only designers can apply for designer tasks"),
   (req, res, next) => designerController.apply(req, res, next)
 );
+router.delete(
+  "/designer-tasks/:id/apply",
+  authenticate,
+  requireExactRole(UserRole.DESIGNER, "Only designers can withdraw designer task applications"),
+  (req, res, next) => designerController.withdrawApplication(req, res, next)
+);
 router.get("/designer-tasks/:id/applications", authenticate, authorize(UserRole.CEO, UserRole.GENERAL_MANAGER), (req, res, next) => designerController.listApplications(req, res, next));
 router.get("/designer-tasks/:id/submissions", authenticate, authorize(UserRole.CEO, UserRole.GENERAL_MANAGER, UserRole.DESIGNER), (req, res, next) => designerController.getSubmissions(req, res, next));
 router.post(
