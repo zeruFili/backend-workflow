@@ -453,7 +453,17 @@ export class DesignerController {
       const { reason } = (req.body || {}) as { reason?: string };
       const reasonStr = (reason && typeof reason === "string" && reason.trim().length > 0) ? reason.trim() : "Task removed by admin";
 
+      console.log('[DesignerController.removeTask] ========== DELETE TASK REQUEST ==========');
+      console.log('[DesignerController.removeTask] Task ID:', taskId);
+      console.log('[DesignerController.removeTask] User:', { id: req.user.id, role: req.user.role });
+      console.log('[DesignerController.removeTask] Reason:', reasonStr);
+
       const task = await designerService.removeTask(taskId, req.user.id, reasonStr);
+
+      console.log('[DesignerController.removeTask] Service returned successfully');
+      console.log('[DesignerController.removeTask] Task state after removal:', task.task_state);
+      console.log('[DesignerController.removeTask] ========== DELETE TASK COMPLETE ==========');
+
       res.status(200).json({ success: true, data: task, message: "Task removed successfully" });
     } catch (error) {
       next(error);

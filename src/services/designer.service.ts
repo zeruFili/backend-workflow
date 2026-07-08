@@ -209,7 +209,8 @@ export class DesignerService {
     const qb = this.taskRepo.createQueryBuilder("t")
       .leftJoinAndSelect("t.assigned_to_user", "assigned_to_user")
       .leftJoinAndSelect("t.assigned_by_user", "assigned_by_user")
-      .leftJoinAndSelect("t.updated_by_user", "updated_by_user");
+      .leftJoinAndSelect("t.updated_by_user", "updated_by_user")
+      .andWhere("t.task_state = :taskState", { taskState: TaskState.ACTIVE });
 
     this.applyTaskListVisibilityScope(qb, currentUser);
 
@@ -1433,8 +1434,17 @@ export class DesignerService {
   }
 
   async removeTask(taskId: string, removedByUserId: string, reason: string) {
+    console.log('[DesignerService.removeTask] ========== DELETE TASK SERVICE ==========');
+    console.log('[DesignerService.removeTask] Task ID:', taskId);
+    console.log('[DesignerService.removeTask] Removed by:', removedByUserId);
+    console.log('[DesignerService.removeTask] Reason:', reason);
+
     const task = await this.taskRepo.findOneBy({ id: taskId });
     if (!task) throw new AppError(404, "Designer task not found");
+
+    console.log('[DesignerService.removeTask] Task found - title:', task.title);
+    console.log('[DesignerService.removeTask] Task found - assigned_to_user_id:', task.assigned_to_user_id);
+    console.log('[DesignerService.removeTask] Task found - task_state:', task.task_state);
 
     const submissions = await this.submissionRepo.find({
       where: { designer_task_id: taskId },
@@ -1460,10 +1470,19 @@ export class DesignerService {
     removal.reason = reason;
     await this.removalRepo.save(removal);
 
+    await this.notificationRepo.delete({ parent_id: taskId });
+    await this.notificationRepo.delete({ resource_id: taskId });
+
+    console.log('[DesignerService.removeTask] Deleted notifications for parent_id and resource_id:', taskId);
+    console.log('[DesignerService.removeTask] Setting task_state to DEACTIVE');
+
     task.task_state = TaskState.DEACTIVE;
     task.updated_by = removedByUserId as any;
     task.updated_at = new Date();
     await this.taskRepo.save(task);
+
+    console.log('[DesignerService.removeTask] Task saved with task_state:', task.task_state);
+    console.log('[DesignerService.removeTask] ========== DELETE TASK COMPLETE ==========');
 
     return task;
   }

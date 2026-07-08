@@ -814,6 +814,8 @@ export class QuantitySurveyorService {
       }
     }
 
+    await this.notificationRepo.delete({ parent_id: taskId });
+
     task.task_state = TaskState.DEACTIVE;
     task.updated_at = new Date();
     await this.taskRepo.save(task);
