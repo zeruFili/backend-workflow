@@ -48,7 +48,7 @@ interface UpdateTaskParams {
   is_public?: boolean;
   story_point?: number;
   due_date?: string;
-  assigned_to_user_id?: string;
+  assigned_to_user_id?: string | null;
   attachment_urls?: string[];
 }
 
@@ -557,8 +557,26 @@ export class DesignerService {
   }
 
   async updateTask(id: string, params: UpdateTaskParams, currentUser: UpdateTaskActor) {
+    console.log('[DesignerService.updateTask] ========== UPDATE TASK SERVICE ==========');
+    console.log('[DesignerService.updateTask] Task ID:', id);
+    console.log('[DesignerService.updateTask] Params:', JSON.stringify(params, null, 2));
+    console.log('[DesignerService.updateTask] Current user:', { id: currentUser.id, role: currentUser.role });
+
     const task = await this.taskRepo.findOneBy({ id });
     if (!task) throw new AppError(404, "Designer task not found");
+
+    console.log('[DesignerService.updateTask] TASK BEFORE UPDATE:');
+    console.log('[DesignerService.updateTask]   - title:', task.title);
+    console.log('[DesignerService.updateTask]   - description:', task.description ? task.description.substring(0, 100) + '...' : 'null');
+    console.log('[DesignerService.updateTask]   - story_point:', task.story_point);
+    console.log('[DesignerService.updateTask]   - is_public:', task.is_public);
+    console.log('[DesignerService.updateTask]   - due_date:', task.due_date);
+    console.log('[DesignerService.updateTask]   - assigned_to_user_id:', task.assigned_to_user_id);
+    console.log('[DesignerService.updateTask]   - assigned_at:', task.assigned_at);
+    console.log('[DesignerService.updateTask]   - stage:', task.stage);
+    console.log('[DesignerService.updateTask]   - status:', task.status);
+    console.log('[DesignerService.updateTask]   - is_paused:', task.is_paused);
+    console.log('[DesignerService.updateTask]   - attachment_urls:', task.attachment_urls);
 
     if (currentUser.role === UserRole.GENERAL_MANAGER) {
       if (task.assigned_by_user_id !== currentUser.id) {
@@ -587,16 +605,23 @@ export class DesignerService {
     const previousAssignee = task.assigned_to_user_id;
     const previousIsPublic = task.is_public;
 
-    if (params.title !== undefined) task.title = params.title;
-    if (params.description !== undefined) task.description = params.description;
-    if (params.status !== undefined) task.status = params.status;
-    if (params.stage !== undefined) task.stage = params.stage;
-    if (params.is_public !== undefined) task.is_public = params.is_public;
-    if (params.story_point !== undefined) task.story_point = params.story_point;
-    if (params.due_date !== undefined) task.due_date = params.due_date as any;
-    if (params.assigned_to_user_id !== undefined) task.assigned_to_user_id = params.assigned_to_user_id as any;
+    console.log('[DesignerService.updateTask] VALUES BEING UPDATED:');
+    if (params.title !== undefined) { task.title = params.title; console.log('[DesignerService.updateTask]   - title:', params.title); }
+    if (params.description !== undefined) { task.description = params.description; console.log('[DesignerService.updateTask]   - description:', params.description?.substring(0, 80) + '...'); }
+    if (params.status !== undefined) { task.status = params.status; console.log('[DesignerService.updateTask]   - status:', params.status); }
+    if (params.stage !== undefined) { task.stage = params.stage; console.log('[DesignerService.updateTask]   - stage:', params.stage); }
+    if (params.is_public !== undefined) { task.is_public = params.is_public; console.log('[DesignerService.updateTask]   - is_public:', params.is_public); }
+    if (params.story_point !== undefined) { task.story_point = params.story_point; console.log('[DesignerService.updateTask]   - story_point:', params.story_point); }
+    if (params.due_date !== undefined) { task.due_date = params.due_date as any; console.log('[DesignerService.updateTask]   - due_date:', params.due_date); }
+    if (params.assigned_to_user_id !== undefined) {
+      task.assigned_to_user_id = params.assigned_to_user_id as any;
+      task.assigned_at = params.assigned_to_user_id ? (previousAssignee ? task.assigned_at : new Date()) : null;
+      console.log('[DesignerService.updateTask]   - assigned_to_user_id:', params.assigned_to_user_id, '(was:', previousAssignee, ')');
+      console.log('[DesignerService.updateTask]   - assigned_at set to:', task.assigned_at);
+    }
     if (params.attachment_urls !== undefined) {
       task.attachment_urls = syncAttachments(task.attachment_urls, params.attachment_urls) as any;
+      console.log('[DesignerService.updateTask]   - attachment_urls:', task.attachment_urls);
     }
 
     task.updated_by = currentUser.id as any;
@@ -645,11 +670,7 @@ export class DesignerService {
       }
     }
 
-    if (
-      params.assigned_to_user_id !== undefined &&
-      params.assigned_to_user_id !== previousAssignee &&
-      params.assigned_to_user_id
-    ) {
+    if (params.assigned_to_user_id !== undefined && params.assigned_to_user_id !== previousAssignee) {
       if (previousAssignee) {
         await this.notificationRepo.delete({
           parent_id: id,
@@ -657,23 +678,25 @@ export class DesignerService {
           user_id: previousAssignee,
         });
       }
-      await this.notifyTaskAssignment(saved.id, params.assigned_to_user_id, currentUser.id);
-      // Clear Designer-specific public-task notifications since the task is now assigned
-      const designerUsers = await this.userRepo.find({
-        where: { role: UserRole.DESIGNER, is_active: true },
-        select: ["id"],
-      });
-      if (designerUsers.length > 0) {
-        const designerIds = designerUsers.map((d) => d.id);
-        await this.notificationRepo.update(
-          {
-            user_id: In(designerIds),
-            parent_id: id,
-            resource_type: ResourceType.POSTED_JOB,
-            viewed: false,
-          },
-          { viewed: true }
-        );
+      if (params.assigned_to_user_id) {
+        await this.notifyTaskAssignment(saved.id, params.assigned_to_user_id, currentUser.id);
+        // Clear Designer-specific public-task notifications since the task is now assigned
+        const designerUsers = await this.userRepo.find({
+          where: { role: UserRole.DESIGNER, is_active: true },
+          select: ["id"],
+        });
+        if (designerUsers.length > 0) {
+          const designerIds = designerUsers.map((d) => d.id);
+          await this.notificationRepo.update(
+            {
+              user_id: In(designerIds),
+              parent_id: id,
+              resource_type: ResourceType.POSTED_JOB,
+              viewed: false,
+            },
+            { viewed: true }
+          );
+        }
       }
     }
 

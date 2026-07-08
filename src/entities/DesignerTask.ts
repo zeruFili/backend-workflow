@@ -71,5 +71,5 @@ export class DesignerTask {
   updated_at: Date;
 
   @Column({ type: "timestamptz", nullable: true })
-  assigned_at: Date;
+  assigned_at: Date | null;
 }

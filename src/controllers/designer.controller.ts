@@ -131,6 +131,11 @@ export class DesignerController {
       }
 
       const id = req.params.id as string;
+      console.log('[DesignerController.updateTask] ========== UPDATE TASK REQUEST ==========');
+      console.log('[DesignerController.updateTask] Task ID:', id);
+      console.log('[DesignerController.updateTask] Raw req.body:', JSON.stringify(req.body, null, 2));
+      console.log('[DesignerController.updateTask] User:', { id: req.user.id, role: req.user.role });
+
       const bodyForValidation = { ...req.body } as any;
       if (bodyForValidation.story_point !== undefined) {
         bodyForValidation.story_point = parseInt(bodyForValidation.story_point as any, 10);
@@ -138,6 +143,22 @@ export class DesignerController {
       if (bodyForValidation.is_public !== undefined) {
         bodyForValidation.is_public = bodyForValidation.is_public === 'true' || bodyForValidation.is_public === true;
       }
+
+      let assignedTo: string | null | undefined;
+      if (bodyForValidation.assigned_to_user_id !== undefined) {
+        const raw = bodyForValidation.assigned_to_user_id;
+        console.log('[DesignerController.updateTask] Raw assigned_to_user_id:', raw, '| type:', typeof raw);
+        if (raw === 'null' || raw === '' || raw === null) {
+          assignedTo = null;
+        } else if (typeof raw === 'string' && raw.length > 0) {
+          assignedTo = raw;
+        } else {
+          assignedTo = undefined;
+        }
+      }
+      console.log('[DesignerController.updateTask] Resolved assignedTo:', assignedTo);
+      delete bodyForValidation.assigned_to_user_id;
+
       const dto = await validateDto(UpdateDesignerTaskDto, bodyForValidation, req);
 
       const filePaths = getFilePathsFromRequest(req, "designer_tasks");
@@ -147,9 +168,14 @@ export class DesignerController {
 
       const task = await designerService.updateTask(
         id,
-        { ...dto, attachment_urls: mergedUrls },
+        { ...dto, attachment_urls: mergedUrls, assigned_to_user_id: assignedTo },
         req.user
       );
+      console.log('[DesignerController.updateTask] Update service returned successfully');
+      console.log('[DesignerController.updateTask] Response data keys:', Object.keys(task));
+      console.log('[DesignerController.updateTask] Response assigned_to_user_id:', task.assigned_to_user_id);
+      console.log('[DesignerController.updateTask] Response is_public:', task.is_public);
+      console.log('[DesignerController.updateTask] ========== UPDATE TASK COMPLETE ==========');
       res.status(200).json({ success: true, data: task, message: "Designer task updated successfully" });
     } catch (error) {
       next(error);

@@ -1,4 +1,4 @@
-import { IsString, IsEnum, IsOptional, Length, IsUUID, IsInt, Min, Max, IsBoolean, IsArray } from "class-validator";
+import { IsString, IsEnum, IsOptional, Length, IsUUID, IsInt, Min, Max, IsBoolean, IsArray, ValidateIf } from "class-validator";
 import { DesignerStage } from "../enums/designer-stage.enum";
 import { ReviewOutcome } from "../enums/review-outcome.enum";
 
@@ -66,10 +66,6 @@ export class UpdateDesignerTaskDto {
   @IsOptional()
   @IsString()
   due_date?: string;
-
-  @IsOptional()
-  @IsUUID()
-  assigned_to_user_id?: string;
 
   @IsOptional()
   @IsArray()
