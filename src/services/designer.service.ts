@@ -241,6 +241,10 @@ export class DesignerService {
     const taskReviews = await this.batchTaskReviews(taskIds);
     const appTimestamps = await this.batchLatestApplicationTimestamps(taskIds);
 
+    const appliedStatuses = currentUser.role === UserRole.DESIGNER
+      ? await this.batchApplicationStatuses(taskIds, currentUser.id)
+      : {};
+
     // Sort by latest activity (task, submission, review, application, or assignment timestamps) descending
     data.sort((a, b) => {
       const aTs = Math.max(
@@ -282,6 +286,7 @@ export class DesignerService {
           submissionsWithReviews: restSwr,
           hasNestedNotification,
           taskReview: taskReviews[task.id] || null,
+          applied: appliedStatuses[task.id] || false,
         };
       }),
       meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
@@ -474,6 +479,20 @@ export class DesignerService {
       if (cur === undefined || ts > cur) {
         result[row.task_id] = ts;
       }
+    }
+    return result;
+  }
+
+  private async batchApplicationStatuses(taskIds: string[], userId: string): Promise<Record<string, boolean>> {
+    if (taskIds.length === 0) return {};
+
+    const apps = await this.applicationRepo.find({
+      where: taskIds.map((id) => ({ designer_task_id: id, applicant_user_id: userId } as any)),
+    });
+
+    const result: Record<string, boolean> = {};
+    for (const app of apps) {
+      result[app.designer_task_id] = true;
     }
     return result;
   }
