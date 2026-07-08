@@ -19,7 +19,7 @@ export const ROLE_RESOURCE_FILTERS: Record<string, DomainFilterConfig> = {
   dataCollectorTasks: {
     parentType: ParentType.DATA_COLLECTOR_TASK,
     filters: {
-      [UserRole.DATA_COLLECTOR]: [ResourceType.REVIEW],
+      [UserRole.DATA_COLLECTOR]: [ResourceType.TASK_ASSIGNED, ResourceType.REVIEW],
       [UserRole.GENERAL_MANAGER]: [ResourceType.SUBMISSION, ResourceType.REVIEW],
       [UserRole.CEO]: [ResourceType.SUBMISSION, ResourceType.REVIEW],
     },
