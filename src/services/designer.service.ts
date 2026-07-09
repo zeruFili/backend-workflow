@@ -1045,9 +1045,7 @@ export class DesignerService {
           `Cannot skip stages. Current stage is "${task.stage}".`
         );
       }
-      if (stageIdx < currentStageIdx) {
-        throw new AppError(400, `Cannot submit to a previous stage. Current stage is "${task.stage}".`);
-      }
+      // Allow submissions to previous stages (no rejection for stageIdx < currentStageIdx)
     }
 
     const submission = new DesignerSubmission();
@@ -1059,7 +1057,10 @@ export class DesignerService {
     const saved = await this.submissionRepo.save(submission);
 
     task.status = ReviewOutcome.PENDING;
-    task.stage = resolvedStage;
+    // Only advance the stage forward, never roll back to a previous stage
+    if (!task.stage || stageIdx >= STAGE_ORDER.indexOf(task.stage)) {
+      task.stage = resolvedStage;
+    }
     task.updated_by = userId as any;
     task.updated_at = new Date();
     await this.taskRepo.save(task);
