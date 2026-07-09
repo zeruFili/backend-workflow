@@ -627,6 +627,8 @@ export class MarketingService {
     task.updated_at = new Date();
     await this.taskRepo.save(task);
 
+    const notifiedUserIds = new Set<string>();
+
     if (task.marketing_user_id) {
       await this.createNotification({
         user_id: task.marketing_user_id,
@@ -637,6 +639,28 @@ export class MarketingService {
         parent_type: ParentType.MARKETING_TASK,
         type: `Your submission was ${reviewOutcome}`,
       });
+      notifiedUserIds.add(task.marketing_user_id);
+    }
+
+    const ceoFinance = await this.userRepo.find({
+      where: [
+        { role: UserRole.CEO, is_active: true },
+        { role: UserRole.FINANCE, is_active: true },
+      ],
+    });
+
+    for (const user of ceoFinance) {
+      if (!notifiedUserIds.has(user.id)) {
+        await this.createNotification({
+          user_id: user.id,
+          from_user_id: reviewerUserId,
+          resource_id: saved.id,
+          resource_type: ResourceType.REVIEW,
+          parent_id: task.id,
+          parent_type: ParentType.MARKETING_TASK,
+          type: `Marketing submission was ${reviewOutcome}`,
+        });
+      }
     }
 
     return saved;
