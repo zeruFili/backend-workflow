@@ -627,7 +627,7 @@ export class MarketingService {
     task.updated_at = new Date();
     await this.taskRepo.save(task);
 
-    const notifiedUserIds = new Set<string>();
+    const notifiedUserIds = new Set<string>([reviewerUserId]);
 
     if (task.marketing_user_id) {
       await this.createNotification({
