@@ -390,10 +390,18 @@ export class DataCollectorService {
 
     if (
       params.assigned_to_user_id !== undefined &&
-      params.assigned_to_user_id !== previousAssignee &&
-      params.assigned_to_user_id
+      params.assigned_to_user_id !== previousAssignee
     ) {
-      await this.notifyTaskAssignment(saved.id, params.assigned_to_user_id, userId);
+      if (previousAssignee) {
+        await this.notificationRepo.delete({
+          parent_id: id,
+          resource_type: ResourceType.TASK_ASSIGNED,
+          user_id: previousAssignee,
+        });
+      }
+      if (params.assigned_to_user_id) {
+        await this.notifyTaskAssignment(saved.id, params.assigned_to_user_id, userId);
+      }
     }
 
     await this.refreshResourceNotifications(id, userId);

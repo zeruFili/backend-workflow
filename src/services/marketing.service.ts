@@ -471,6 +471,9 @@ export class MarketingService {
     task.task_state = TaskState.DEACTIVE;
     task.updated_by = userId as any;
     task.updated_at = new Date();
+
+    await this.notificationRepo.delete({ parent_id: id });
+
     return this.taskRepo.save(task);
   }
 

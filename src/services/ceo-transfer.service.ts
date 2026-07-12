@@ -138,6 +138,7 @@ export class CeoTransferService {
     const transfer = await this.repo.findOneBy({ id });
     if (!transfer) throw new AppError(404, "CEO transfer not found");
 
+    await this.notificationRepo.delete({ parent_id: id });
     await this.repo.remove(transfer);
     return { id };
   }
