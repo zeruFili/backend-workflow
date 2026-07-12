@@ -47,16 +47,25 @@ export class CeoTransferService {
     return this.notificationRepo.save(n);
   }
 
-  async findAll(page: number = 1, limit: number = 20) {
+  async findAll(page: number = 1, limit: number = 20, user?: { id: string; role: string }) {
     const p = Math.max(1, page);
     const l = Math.min(100, Math.max(1, limit));
 
-    const [data, total] = await this.repo.findAndCount({
-      relations: ["finance_user", "ceo_user"],
-      order: { created_at: "DESC" },
-      skip: (p - 1) * l,
-      take: l,
-    });
+    const qb = this.repo.createQueryBuilder("ct")
+      .leftJoinAndSelect("ct.finance_user", "finance_user")
+      .leftJoinAndSelect("ct.ceo_user", "ceo_user")
+      .orderBy("ct.created_at", "DESC")
+      .skip((p - 1) * l)
+      .take(l);
+
+    if (user) {
+      if (user.role === 'finance_officer') {
+        qb.andWhere("ct.finance_user_id = :userId", { userId: user.id });
+      }
+      // CEO sees all — no filter
+    }
+
+    const [data, total] = await qb.getManyAndCount();
 
     const sanitized = data.map((t) => ({
       ...t,
@@ -117,9 +126,13 @@ export class CeoTransferService {
     return saved;
   }
 
-  async update(id: string, params: UpdateTransferParams) {
+  async update(id: string, params: UpdateTransferParams, userId: string) {
     const transfer = await this.repo.findOneBy({ id });
     if (!transfer) throw new AppError(404, "CEO transfer not found");
+
+    if (transfer.finance_user_id !== userId) {
+      throw new AppError(403, "You can only edit transfers that you created.");
+    }
 
     if (params.finance_user_id !== undefined) transfer.finance_user_id = params.finance_user_id;
     if (params.ceo_user_id !== undefined) transfer.ceo_user_id = params.ceo_user_id;
@@ -134,9 +147,13 @@ export class CeoTransferService {
     return this.repo.save(transfer);
   }
 
-  async delete(id: string) {
+  async delete(id: string, userId: string) {
     const transfer = await this.repo.findOneBy({ id });
     if (!transfer) throw new AppError(404, "CEO transfer not found");
+
+    if (transfer.finance_user_id !== userId) {
+      throw new AppError(403, "You can only delete transfers that you created.");
+    }
 
     await this.notificationRepo.delete({ parent_id: id });
     await this.repo.remove(transfer);

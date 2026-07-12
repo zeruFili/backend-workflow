@@ -536,6 +536,7 @@ export class QuantitySurveyorService {
       submission.attachment_urls = syncAttachments(submission.attachment_urls, params.attachment_urls) as any;
     }
     if (params.status !== undefined) submission.review_status = params.status;
+    submission.updated_at = new Date();
 
     const saved = await this.submissionRepo.save(submission);
 
@@ -682,6 +683,7 @@ export class QuantitySurveyorService {
     if (params.description !== undefined) {
       review.description = params.description;
     }
+    review.updated_at = new Date();
 
     const saved = await this.reviewRepo.save(review);
 

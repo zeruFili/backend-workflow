@@ -29,10 +29,15 @@ async function validateDto<T extends object>(dtoClass: new () => T, plain: objec
 export class CeoTransferController {
   async findAll(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
+      if (!req.user) {
+        res.status(401).json({ success: false, message: "Unauthorized" });
+        return;
+      }
+
       const page = req.query.page ? parseInt(req.query.page as string, 10) : 1;
       const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 20;
 
-      const result = await ceoTransferService.findAll(page, limit);
+      const result = await ceoTransferService.findAll(page, limit, req.user);
       res.status(200).json({ success: true, ...result });
     } catch (error) {
       next(error);
@@ -90,7 +95,7 @@ export class CeoTransferController {
       const result = await ceoTransferService.update(id, {
         ...dto,
         attachment_urls: mergedUrls,
-      });
+      }, req.user.id);
 
       res.status(200).json({ success: true, data: result, message: "CEO transfer updated" });
     } catch (error) {
@@ -101,7 +106,7 @@ export class CeoTransferController {
   async delete(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
       const id = req.params.id as string;
-      await ceoTransferService.delete(id);
+      await ceoTransferService.delete(id, req.user!.id);
       res.status(200).json({ success: true, message: "CEO transfer deleted" });
     } catch (error) {
       next(error);
