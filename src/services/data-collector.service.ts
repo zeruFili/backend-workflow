@@ -38,7 +38,7 @@ interface UpdateTaskParams {
   status?: DataCollectorTaskStatus;
   task_state?: TaskState;
   due_date?: string;
-  assigned_to_user_id?: string;
+  assigned_to_user_id?: string | null;
   attachment_urls?: string[];
 }
 

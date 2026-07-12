@@ -102,7 +102,24 @@ export class DataCollectorController {
       }
 
       const id = req.params.id as string;
-      const dto = await validateDto(UpdateDCTaskDto, req.body, req);
+
+      // Handle assigned_to_user_id null conversion (like designer controller)
+      const bodyForValidation = { ...req.body } as any;
+      let assignedTo: string | null | undefined;
+      if (bodyForValidation.assigned_to_user_id !== undefined) {
+        const raw = bodyForValidation.assigned_to_user_id;
+        if (raw === 'null' || raw === '' || raw === null) {
+          assignedTo = null;
+        } else if (typeof raw === 'string' && raw.length > 0) {
+          assignedTo = raw;
+        } else {
+          assignedTo = undefined;
+        }
+      }
+      delete bodyForValidation.assigned_to_user_id;
+
+      const dto = await validateDto(UpdateDCTaskDto, bodyForValidation, req);
+      req.body = bodyForValidation;
 
       const filePaths = getFilePathsFromRequest(req, "dc_tasks");
       const bodyAttachmentUrls = req.body.attachment_urls as string[] | undefined;
@@ -111,7 +128,7 @@ export class DataCollectorController {
 
       const task = await dataCollectorService.updateTask(
         id,
-        { ...dto, attachment_urls: mergedUrls },
+        { ...dto, attachment_urls: mergedUrls, assigned_to_user_id: assignedTo },
         req.user.id
       );
       res.status(200).json({ success: true, data: task, message: "Data collector task updated successfully" });

@@ -38,7 +38,7 @@ interface UpdateTaskParams {
   status?: ReviewOutcome;
   due_date?: string;
   attachment_urls?: string[];
-  assigned_to_user_id?: string;
+  assigned_to_user_id?: string | null;
 }
 
 export class QuantitySurveyorService {
