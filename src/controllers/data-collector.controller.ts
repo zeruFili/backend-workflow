@@ -176,8 +176,18 @@ export class DataCollectorController {
       const { description } = req.body;
 
       const filePaths = getFilePathsFromRequest(req, "dc_submissions");
-      const bodyAttachmentUrls = req.body.attachment_urls as string[] | undefined;
-      const hasAttachments = filePaths.length > 0 || bodyAttachmentUrls !== undefined;
+
+      const raw = req.body.attachment_urls;
+      let bodyAttachmentUrls: string[] | undefined;
+      if (Array.isArray(raw)) {
+        bodyAttachmentUrls = raw.filter((u: string) => u != null && u !== '' && String(u).trim() !== '');
+      } else if (raw !== undefined && raw !== null && raw !== '' && String(raw).trim() !== '') {
+        bodyAttachmentUrls = [raw];
+      } else {
+        bodyAttachmentUrls = [];
+      }
+
+      const hasAttachments = filePaths.length > 0 || bodyAttachmentUrls.length > 0 || raw !== undefined;
       const mergedUrls = hasAttachments ? [...filePaths, ...(bodyAttachmentUrls || [])] : undefined;
 
       const submission = await dataCollectorService.updateSubmission(submissionId, req.user.id, {
