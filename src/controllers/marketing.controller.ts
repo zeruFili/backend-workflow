@@ -114,11 +114,25 @@ export class MarketingController {
       }
 
       const id = req.params.id as string;
-      const dto = await validateDto(UpdateMarketingTaskDto, req.body, req);
+
+      const raw = req.body.attachment_urls;
+      const bodyForValidation = { ...req.body } as any;
+      delete bodyForValidation.attachment_urls;
+
+      const dto = await validateDto(UpdateMarketingTaskDto, bodyForValidation, req);
 
       const filePaths = getFilePathsFromRequest(req, "marketing_tasks");
-      const bodyAttachmentUrls = req.body.attachment_urls as string[] | undefined;
-      const hasAttachments = filePaths.length > 0 || bodyAttachmentUrls !== undefined;
+
+      let bodyAttachmentUrls: string[] | undefined;
+      if (Array.isArray(raw)) {
+        bodyAttachmentUrls = raw.filter((u: string) => u != null && u !== '' && String(u).trim() !== '');
+      } else if (raw !== undefined && raw !== null && raw !== '' && String(raw).trim() !== '') {
+        bodyAttachmentUrls = [raw];
+      } else {
+        bodyAttachmentUrls = [];
+      }
+
+      const hasAttachments = filePaths.length > 0 || (bodyAttachmentUrls ?? []).length > 0 || raw != null;
       const mergedUrls = hasAttachments ? [...filePaths, ...(bodyAttachmentUrls || [])] : undefined;
 
       const task = await marketingService.updateTask(
