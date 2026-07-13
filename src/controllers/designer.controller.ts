@@ -159,11 +159,23 @@ export class DesignerController {
       console.log('[DesignerController.updateTask] Resolved assignedTo:', assignedTo);
       delete bodyForValidation.assigned_to_user_id;
 
+      const raw = req.body.attachment_urls;
+      delete bodyForValidation.attachment_urls;
+
       const dto = await validateDto(UpdateDesignerTaskDto, bodyForValidation, req);
 
       const filePaths = getFilePathsFromRequest(req, "designer_tasks");
-      const bodyAttachmentUrls = req.body.attachment_urls as string[] | undefined;
-      const hasAttachments = filePaths.length > 0 || bodyAttachmentUrls !== undefined;
+
+      let bodyAttachmentUrls: string[] | undefined;
+      if (Array.isArray(raw)) {
+        bodyAttachmentUrls = raw.filter((u: string) => u != null && u !== '' && String(u).trim() !== '');
+      } else if (raw !== undefined && raw !== null && raw !== '' && String(raw).trim() !== '') {
+        bodyAttachmentUrls = [raw];
+      } else {
+        bodyAttachmentUrls = [];
+      }
+
+      const hasAttachments = filePaths.length > 0 || (bodyAttachmentUrls ?? []).length > 0 || raw != null;
       const mergedUrls = hasAttachments ? [...filePaths, ...(bodyAttachmentUrls || [])] : undefined;
 
       const task = await designerService.updateTask(
