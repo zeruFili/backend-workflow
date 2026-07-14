@@ -18,6 +18,7 @@ const submissionUploadMiddleware = createUploadFileMiddleware({
   subfolder: "designer_submissions",
 });
 
+router.get("/designer-performance", authenticate, authorize(UserRole.CEO, UserRole.GENERAL_MANAGER, UserRole.DESIGNER), (req, res, next) => designerController.getPerformance(req, res, next));
 router.get("/designer-tasks", authenticate, (req, res, next) => designerController.findAllTasks(req, res, next));
 router.post(
   "/designer-tasks",

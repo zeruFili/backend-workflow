@@ -152,8 +152,7 @@ export class QuantitySurveyorService {
 
     qb.orderBy("t.created_at", "DESC");
 
-    const skip = (page - 1) * limit;
-    const [data, total] = await qb.skip(skip).take(limit).getManyAndCount();
+    const [data, total] = await qb.getManyAndCount();
 
     const taskIds = data.map((t) => t.id);
     const submissionsByTask = await this.batchSubmissionsWithReviews(taskIds, currentUser.id);
@@ -173,9 +172,13 @@ export class QuantitySurveyorService {
       return bTs - aTs;
     });
 
+    // Apply pagination AFTER sorting by latest activity
+    const skip = (page - 1) * limit;
+    const paged = data.slice(skip, skip + limit);
+
     return {
       success: true,
-      data: data.map((task) => {
+      data: paged.map((task) => {
         const swr = submissionsByTask[task.id] || {
           taskNotification: { hasNotification: false, notificationId: null },
           submissions: [],

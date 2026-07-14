@@ -80,6 +80,48 @@ export class DesignerController {
     }
   }
 
+  async getPerformance(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      if (!req.user) {
+        res.status(401).json({ success: false, message: 'Unauthorized' });
+        return;
+      }
+
+      const mode = req.query.mode as string;
+      const validModes = ['weekly', 'monthly', 'quarterly', 'yearly'];
+      if (!mode || !validModes.includes(mode)) {
+        res.status(400).json({ success: false, message: `Invalid mode. Must be one of: ${validModes.join(', ')}` });
+        return;
+      }
+
+      const year = parseInt(req.query.year as string, 10);
+      if (isNaN(year) || year < 2000 || year > 2100) {
+        res.status(400).json({ success: false, message: 'Invalid year' });
+        return;
+      }
+
+      const periodValue = parseInt(req.query.periodValue as string, 10);
+      if (isNaN(periodValue) || periodValue < 0) {
+        res.status(400).json({ success: false, message: 'Invalid periodValue' });
+        return;
+      }
+
+      const userId = req.query.userId as string | undefined;
+
+      const result = await designerService.getDesignerPerformance({
+        userId,
+        mode: mode as 'weekly' | 'monthly' | 'quarterly' | 'yearly',
+        year,
+        periodValue,
+        currentUser: req.user,
+      });
+
+      res.status(200).json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async findTaskById(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
       const id = req.params.id as string;

@@ -139,16 +139,10 @@ export class MarketingService {
 
     qb.orderBy("t.created_at", "DESC");
 
-    const skip = (page - 1) * limit;
-    const [data, total] = await qb.skip(skip).take(limit).getManyAndCount();
+    const [data, total] = await qb.getManyAndCount();
 
     const taskIds = data.map((t) => t.id);
-    console.log('[MarketingService] findAllTasks - taskIds:', taskIds);
     const submissionsByTask = await this.batchSubmissionsWithReviews(taskIds, currentUser.id);
-    console.log('[MarketingService] findAllTasks - submissionsByTask keys:', Object.keys(submissionsByTask));
-    for (const [tid, swr] of Object.entries(submissionsByTask)) {
-      console.log(`[MarketingService] Task ${tid}: ${swr.submissions.length} submissions`);
-    }
 
     // Sort by latest activity (task, submission, or review timestamps) descending
     data.sort((a, b) => {
@@ -165,9 +159,13 @@ export class MarketingService {
       return bTs - aTs;
     });
 
+    // Apply pagination AFTER sorting by latest activity
+    const skip = (page - 1) * limit;
+    const paged = data.slice(skip, skip + limit);
+
     return {
       success: true,
-      data: data.map((task) => {
+      data: paged.map((task) => {
         const swr = submissionsByTask[task.id] || {
           taskNotification: { hasNotification: false, notificationId: null },
           submissions: [],

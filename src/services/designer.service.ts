@@ -231,8 +231,7 @@ export class DesignerService {
 
     qb.orderBy("t.created_at", "DESC");
 
-    const skip = (page - 1) * limit;
-    const [data, total] = await qb.skip(skip).take(limit).getManyAndCount();
+    const [data, total] = await qb.getManyAndCount();
 
     const taskIds = data.map((t) => t.id);
     const submissionsByTask = await this.batchSubmissionsWithReviews(taskIds, currentUser.id);
@@ -264,9 +263,13 @@ export class DesignerService {
       return bTs - aTs;
     });
 
+    // Apply pagination AFTER sorting by latest activity
+    const skip = (page - 1) * limit;
+    const paged = data.slice(skip, skip + limit);
+
     return {
       success: true,
-      data: data.map((task) => {
+      data: paged.map((task) => {
         const swr = submissionsByTask[task.id] || {
           taskNotification: { hasNotification: false, notificationId: null },
           caseStudy: [],
@@ -1425,6 +1428,234 @@ export class DesignerService {
     }
 
     return saved;
+  }
+
+  async getDesignerPerformance(query: {
+    userId?: string;
+    mode: 'weekly' | 'monthly' | 'quarterly' | 'yearly';
+    year: number;
+    periodValue: number;
+    currentUser: { id: string; role: UserRole };
+  }) {
+    const { userId, mode, year, periodValue, currentUser } = query;
+
+    const isCEO_GM = currentUser.role === UserRole.CEO || currentUser.role === UserRole.GENERAL_MANAGER;
+    const isDesigner = currentUser.role === UserRole.DESIGNER;
+
+    const allDesignersResult = await this.userRepo.find({
+      where: { role: UserRole.DESIGNER, is_active: true },
+      select: ['id', 'full_name', 'email'],
+    });
+    const allDesigners = allDesignersResult.map((d) => ({
+      id: d.id,
+      full_name: d.full_name,
+      email: d.email,
+      initials: d.full_name
+        .split(' ')
+        .map((w) => w.charAt(0))
+        .join('')
+        .toUpperCase()
+        .substring(0, 2),
+    }));
+
+    const targetUserId = isDesigner
+      ? currentUser.id
+      : (userId || allDesigners[0]?.id || '');
+    if (!targetUserId) {
+      return { designers: allDesigners, selected: null, periodLabel: '', periodRange: null, kpis: null, ratingBreakdown: null, storyPointBreakdown: null, previousPeriodLabel: '', previousKpis: null, previousRatingBreakdown: null, previousStoryPointBreakdown: null, trend: [] };
+    }
+
+    const { start, end } = this.periodToRange(mode, year, periodValue);
+    const prev = this.periodToRange(mode, year, periodValue - 1);
+
+    const [currentMetrics, previousMetrics] = await Promise.all([
+      this.queryPerformanceForDesigner(targetUserId, start, end),
+      this.queryPerformanceForDesigner(targetUserId, prev.start, prev.end),
+    ]);
+
+    const trend = await Promise.all(
+      Array.from({ length: 6 }, (_, i) => {
+        const t = this.periodToRange(mode, year, periodValue - (5 - i));
+        return this.queryPerformanceForDesigner(targetUserId, t.start, t.end).then((m) => ({
+          label: this.periodLabel(mode, t.start, t.end),
+          rating: m.ratingAvg,
+          storyPoints: m.totalSp,
+          compliancePercent: m.deadlinePercent,
+        }));
+      })
+    );
+
+    return {
+      designers: allDesigners,
+      selected: allDesigners.find((d) => d.id === targetUserId) || null,
+      periodLabel: this.periodLabel(mode, start, end),
+      periodRange: { start: start.toISOString(), end: end.toISOString() },
+      kpis: currentMetrics,
+      ratingBreakdown: {
+        creativity: currentMetrics.avgCreativity,
+        timeliness: currentMetrics.avgTimeliness,
+        clientUnderstanding: currentMetrics.avgClientUnderstanding,
+        renderingQuality: currentMetrics.avgRenderingQuality,
+      },
+      storyPointBreakdown: {
+        completed: currentMetrics.completedSp,
+        pending: currentMetrics.pendingSp,
+        rejected: currentMetrics.rejectedSp,
+        total: currentMetrics.totalSp,
+      },
+      previousPeriodLabel: this.periodLabel(mode, prev.start, prev.end),
+      previousKpis: previousMetrics,
+      previousRatingBreakdown: previousMetrics
+        ? {
+            creativity: previousMetrics.avgCreativity,
+            timeliness: previousMetrics.avgTimeliness,
+            clientUnderstanding: previousMetrics.avgClientUnderstanding,
+            renderingQuality: previousMetrics.avgRenderingQuality,
+          }
+        : null,
+      previousStoryPointBreakdown: previousMetrics
+        ? {
+            completed: previousMetrics.completedSp,
+            pending: previousMetrics.pendingSp,
+            rejected: previousMetrics.rejectedSp,
+            total: previousMetrics.totalSp,
+          }
+        : null,
+      trend,
+    };
+  }
+
+  private periodToRange(
+    mode: 'weekly' | 'monthly' | 'quarterly' | 'yearly',
+    year: number,
+    periodValue: number,
+  ): { start: Date; end: Date } {
+    if (mode === 'yearly') {
+      return {
+        start: new Date(Date.UTC(year, 0, 1)),
+        end: new Date(Date.UTC(year + 1, 0, 1)),
+      };
+    }
+    if (mode === 'monthly') {
+      const m = periodValue - 1;
+      return {
+        start: new Date(Date.UTC(year, m, 1)),
+        end: new Date(Date.UTC(year, m + 1, 1)),
+      };
+    }
+    if (mode === 'quarterly') {
+      const startMonth = (periodValue - 1) * 3;
+      return {
+        start: new Date(Date.UTC(year, startMonth, 1)),
+        end: new Date(Date.UTC(year, startMonth + 3, 1)),
+      };
+    }
+    const jan1 = new Date(Date.UTC(year, 0, 1));
+    const dayOfWeek = jan1.getUTCDay();
+    const offset = dayOfWeek <= 4 ? 1 - dayOfWeek : 8 - dayOfWeek;
+    const weekOneStart = new Date(Date.UTC(year, 0, 1 + offset));
+    const start = new Date(weekOneStart.getTime() + (periodValue - 1) * 7 * 86400000);
+    const end = new Date(start.getTime() + 7 * 86400000);
+    return { start, end };
+  }
+
+  private periodLabel(
+    mode: 'weekly' | 'monthly' | 'quarterly' | 'yearly',
+    start: Date,
+    end: Date,
+  ): string {
+    const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    if (mode === 'yearly') {
+      return `${start.getUTCFullYear()}`;
+    }
+    if (mode === 'monthly') {
+      return `${MONTHS[start.getUTCMonth()]} ${start.getUTCFullYear()}`;
+    }
+    if (mode === 'quarterly') {
+      const q = Math.floor(start.getUTCMonth() / 3) + 1;
+      return `Q${q} ${start.getUTCFullYear()}`;
+    }
+    const jan1 = new Date(Date.UTC(start.getUTCFullYear(), 0, 1));
+    const weekNum = Math.floor((start.getTime() - jan1.getTime()) / (7 * 86400000)) + 1;
+    return `Week ${weekNum} — ${start.getUTCFullYear()}`;
+  }
+
+  private async queryPerformanceForDesigner(
+    designerId: string,
+    periodStart: Date,
+    periodEnd: Date,
+  ) {
+    const raw = await this.taskRepo
+      .createQueryBuilder('dt')
+      .leftJoin('designer_task_review', 'dtr', 'dtr.designer_task_id = dt.id')
+      .leftJoin(
+        'paused_task',
+        'pt',
+        'pt.designer_task_id = dt.id AND pt.resumed_at IS NULL',
+      )
+      .select([
+        'COUNT(dt.id) AS total_tasks',
+        `COUNT(dt.id) FILTER (WHERE dt.status = 'approved') AS completed`,
+        `COUNT(dt.id) FILTER (WHERE dt.status = 'rejected') AS rejected`,
+        `COUNT(dt.id) FILTER (WHERE dt.status IN ('pending','feedback')) AS in_review`,
+        'COUNT(DISTINCT pt.id) AS paused',
+        'COALESCE(SUM(dt.story_point), 0) AS total_sp',
+        `COALESCE(SUM(dt.story_point) FILTER (WHERE dt.status = 'approved'), 0) AS completed_sp`,
+        `COALESCE(SUM(dt.story_point) FILTER (WHERE dt.status = 'rejected'), 0) AS rejected_sp`,
+        `COALESCE(SUM(dt.story_point) FILTER (WHERE dt.status IN ('pending','feedback')), 0) AS pending_sp`,
+        'ROUND(AVG(dtr.creativity), 1) AS avg_creativity',
+        'ROUND(AVG(dtr.timeliness), 1) AS avg_timeliness',
+        'ROUND(AVG(dtr.client_understanding), 1) AS avg_client_understanding',
+        'ROUND(AVG(dtr.rendering_quality), 1) AS avg_rendering_quality',
+        `CASE WHEN COUNT(dt.id) > 0 THEN ROUND(COUNT(dt.id) FILTER (WHERE dt.status = 'approved') * 100.0 / COUNT(dt.id)) ELSE 0 END AS deadline_percent`,
+      ])
+      .where('dt.assigned_to_user_id = :designerId', { designerId })
+      .andWhere('dt.task_state = :taskState', { taskState: TaskState.ACTIVE })
+      .andWhere('dt.created_at >= :start', {
+        start: periodStart.toISOString(),
+      })
+      .andWhere('dt.created_at < :end', { end: periodEnd.toISOString() })
+      .getRawOne<{
+        total_tasks: string;
+        completed: string;
+        rejected: string;
+        in_review: string;
+        paused: string;
+        total_sp: string;
+        completed_sp: string;
+        rejected_sp: string;
+        pending_sp: string;
+        avg_creativity: string | null;
+        avg_timeliness: string | null;
+        avg_client_understanding: string | null;
+        avg_rendering_quality: string | null;
+        deadline_percent: string;
+      }>();
+
+    const ac = parseFloat(raw?.avg_creativity ?? '') || 0;
+    const at = parseFloat(raw?.avg_timeliness ?? '') || 0;
+    const au = parseFloat(raw?.avg_client_understanding ?? '') || 0;
+    const ar = parseFloat(raw?.avg_rendering_quality ?? '') || 0;
+    const hasRatings = ac + at + au + ar > 0;
+    const ratingAvg = hasRatings ? parseFloat(((ac + at + au + ar) / 4).toFixed(1)) : 0;
+
+    return {
+      totalTasks: parseInt(raw?.total_tasks ?? '0'),
+      completed: parseInt(raw?.completed ?? '0'),
+      rejected: parseInt(raw?.rejected ?? '0'),
+      inReview: parseInt(raw?.in_review ?? '0'),
+      paused: parseInt(raw?.paused ?? '0'),
+      totalSp: parseInt(raw?.total_sp ?? '0'),
+      completedSp: parseInt(raw?.completed_sp ?? '0'),
+      rejectedSp: parseInt(raw?.rejected_sp ?? '0'),
+      pendingSp: parseInt(raw?.pending_sp ?? '0'),
+      avgCreativity: ac || null,
+      avgTimeliness: at || null,
+      avgClientUnderstanding: au || null,
+      avgRenderingQuality: ar || null,
+      deadlinePercent: parseInt(raw?.deadline_percent ?? '0'),
+      ratingAvg: ratingAvg || null,
+    };
   }
 
   async getSubmissions(taskId: string, currentUser?: { id: string; role: UserRole }) {
