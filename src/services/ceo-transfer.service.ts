@@ -26,27 +26,6 @@ export class CeoTransferService {
   private repo = AppDataSource.getRepository(CeoTransfer);
   private notificationRepo = AppDataSource.getRepository(Notification);
 
-  private async createNotification(params: {
-    user_id: string;
-    from_user_id: string;
-    resource_id: string;
-    resource_type: string;
-    parent_id: string;
-    parent_type: string;
-    type: string;
-  }) {
-    const n = new Notification();
-    n.user_id = params.user_id;
-    n.from_user_id = params.from_user_id;
-    n.resource_id = params.resource_id;
-    n.resource_type = params.resource_type as any;
-    n.parent_id = params.parent_id;
-    n.parent_type = params.parent_type as any;
-    n.type = params.type;
-    n.viewed = false;
-    return this.notificationRepo.save(n);
-  }
-
   async findAll(page: number = 1, limit: number = 20, user?: { id: string; role: string }) {
     const p = Math.max(1, page);
     const l = Math.min(100, Math.max(1, limit));
@@ -112,17 +91,6 @@ export class CeoTransferService {
     transfer.attachment_urls = (params.attachment_urls ?? null) as any;
 
     const saved = await this.repo.save(transfer);
-
-    await this.createNotification({
-      user_id: params.ceo_user_id,
-      from_user_id: userId,
-      resource_id: saved.id,
-      resource_type: "transfer" as any,
-      parent_id: saved.id,
-      parent_type: "ceo_transfer" as any,
-      type: "New CEO transfer created",
-    });
-
     return saved;
   }
 
