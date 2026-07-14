@@ -1611,10 +1611,10 @@ export class DesignerService {
       ])
       .where('dt.assigned_to_user_id = :designerId', { designerId })
       .andWhere('dt.task_state = :taskState', { taskState: TaskState.ACTIVE })
-      .andWhere('dt.created_at >= :start', {
+      .andWhere('COALESCE(dt.updated_at, dt.created_at) >= :start', {
         start: periodStart.toISOString(),
       })
-      .andWhere('dt.created_at < :end', { end: periodEnd.toISOString() })
+      .andWhere('COALESCE(dt.updated_at, dt.created_at) < :end', { end: periodEnd.toISOString() })
       .getRawOne<{
         total_tasks: string;
         completed: string;
