@@ -1465,6 +1465,68 @@ export class DesignerService {
       return { designers: allDesigners, selected: null, periodLabel: '', periodRange: null, kpis: null, ratingBreakdown: null, storyPointBreakdown: null, previousPeriodLabel: '', previousKpis: null, previousRatingBreakdown: null, previousStoryPointBreakdown: null, trend: [] };
     }
 
+    if (mode === 'yearly') {
+      const { start, end } = this.periodToRange('yearly', year, 0);
+      const prev = this.periodToRange('yearly', year - 1, 0);
+
+      const [currentMetrics, previousMetrics] = await Promise.all([
+        this.queryPerformanceForDesigner(targetUserId, start, end),
+        this.queryPerformanceForDesigner(targetUserId, prev.start, prev.end),
+      ]);
+
+      const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      const trend = await Promise.all(
+        Array.from({ length: 12 }, (_, i) => {
+          const t = this.periodToRange('monthly', year, i + 1);
+          return this.queryPerformanceForDesigner(targetUserId, t.start, t.end).then((m) => ({
+            label: MONTHS_SHORT[i],
+            rating: m.ratingAvg,
+            storyPoints: m.totalSp,
+            compliancePercent: m.deadlinePercent,
+          }));
+        })
+      );
+
+      return {
+        designers: allDesigners,
+        selected: allDesigners.find((d) => d.id === targetUserId) || null,
+        periodLabel: start.getUTCFullYear().toString(),
+        periodRange: { start: start.toISOString(), end: end.toISOString() },
+        kpis: currentMetrics,
+        ratingBreakdown: {
+          creativity: currentMetrics.avgCreativity,
+          timeliness: currentMetrics.avgTimeliness,
+          clientUnderstanding: currentMetrics.avgClientUnderstanding,
+          renderingQuality: currentMetrics.avgRenderingQuality,
+        },
+        storyPointBreakdown: {
+          completed: currentMetrics.completedSp,
+          pending: currentMetrics.pendingSp,
+          rejected: currentMetrics.rejectedSp,
+          total: currentMetrics.totalSp,
+        },
+        previousPeriodLabel: prev.start.getUTCFullYear().toString(),
+        previousKpis: previousMetrics,
+        previousRatingBreakdown: previousMetrics
+          ? {
+              creativity: previousMetrics.avgCreativity,
+              timeliness: previousMetrics.avgTimeliness,
+              clientUnderstanding: previousMetrics.avgClientUnderstanding,
+              renderingQuality: previousMetrics.avgRenderingQuality,
+            }
+          : null,
+        previousStoryPointBreakdown: previousMetrics
+          ? {
+              completed: previousMetrics.completedSp,
+              pending: previousMetrics.pendingSp,
+              rejected: previousMetrics.rejectedSp,
+              total: previousMetrics.totalSp,
+            }
+          : null,
+        trend,
+      };
+    }
+
     const { start, end } = this.periodToRange(mode, year, periodValue);
     const prev = this.periodToRange(mode, year, periodValue - 1);
 
