@@ -241,7 +241,7 @@ export class DesignerService {
     const appTimestamps = await this.batchLatestApplicationTimestamps(taskIds);
 
     const appliedStatuses = currentUser.role === UserRole.DESIGNER
-      ? await this.batchApplicationStatuses(taskIds, currentUser.id)
+      ? await this.batchApplicationDetails(taskIds, currentUser.id)
       : {};
 
     // Sort by latest activity (task, submission, review, application, or assignment timestamps) descending
@@ -289,7 +289,9 @@ export class DesignerService {
           submissionsWithReviews: restSwr,
           hasNestedNotification,
           taskReview: taskReviews[task.id] || null,
-          applied: appliedStatuses[task.id] || false,
+          applied: appliedStatuses[task.id]?.applied || false,
+          coverNote: appliedStatuses[task.id]?.coverNote || null,
+          applicationId: appliedStatuses[task.id]?.applicationId || null,
         };
       }),
       meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
@@ -487,16 +489,16 @@ export class DesignerService {
     return result;
   }
 
-  private async batchApplicationStatuses(taskIds: string[], userId: string): Promise<Record<string, boolean>> {
+  private async batchApplicationDetails(taskIds: string[], userId: string): Promise<Record<string, { applied: boolean; coverNote: string | null; applicationId: string }>> {
     if (taskIds.length === 0) return {};
 
     const apps = await this.applicationRepo.find({
       where: taskIds.map((id) => ({ designer_task_id: id, applicant_user_id: userId, is_withdrawn: false } as any)),
     });
 
-    const result: Record<string, boolean> = {};
+    const result: Record<string, { applied: boolean; coverNote: string | null; applicationId: string }> = {};
     for (const app of apps) {
-      result[app.designer_task_id] = true;
+      result[app.designer_task_id] = { applied: true, coverNote: app.cover_note, applicationId: app.id };
     }
     return result;
   }
@@ -973,6 +975,18 @@ export class DesignerService {
 
     console.log('[DesignerService.withdrawApplication] ========== WITHDRAW COMPLETE ==========');
     return saved;
+  }
+
+  async updateApplication(taskId: string, applicantUserId: string, coverNote: string) {
+    const application = await this.applicationRepo.findOne({
+      where: { designer_task_id: taskId, applicant_user_id: applicantUserId },
+    });
+    if (!application) throw new AppError(404, "Application not found");
+    if (application.is_withdrawn) throw new AppError(400, "Cannot update a withdrawn application");
+
+    application.cover_note = coverNote;
+    application.updated_at = new Date();
+    return await this.applicationRepo.save(application);
   }
 
   async listApplications(params: ApplicationListParams) {

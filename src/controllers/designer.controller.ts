@@ -16,6 +16,7 @@ import {
   CreateTaskReviewDto,
   UpdateTaskReviewDto,
   DesignApplicationDto,
+  UpdateDesignApplicationDto,
   PauseTaskDto,
 } from "../validators/designer.dto";
 
@@ -287,6 +288,22 @@ export class DesignerController {
       res.status(200).json({ success: true, data: application, message: "Application withdrawn successfully" });
     } catch (error) {
       console.log('[DesignerController.withdrawApplication] ERROR caught:', (error as any)?.message || error);
+      next(error);
+    }
+  }
+
+  async updateApplication(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      if (!req.user) {
+        res.status(401).json({ success: false, message: "Unauthorized" });
+        return;
+      }
+
+      const taskId = req.params.id as string;
+      const dto = await validateDto(UpdateDesignApplicationDto, req.body, req);
+      const application = await designerService.updateApplication(taskId, req.user.id, dto.cover_note);
+      res.status(200).json({ success: true, data: application, message: "Application updated successfully" });
+    } catch (error) {
       next(error);
     }
   }

@@ -137,6 +137,12 @@ export class DesignApplicationDto {
   cover_note?: string;
 }
 
+export class UpdateDesignApplicationDto {
+  @IsString()
+  @Length(10, 2000)
+  cover_note: string;
+}
+
 export class UpdateSubmissionReviewDto {
   @IsString()
   @IsUUID()
