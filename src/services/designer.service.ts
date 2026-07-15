@@ -1373,6 +1373,27 @@ export class DesignerService {
       });
     }
 
+    const ceoGmUsers = await this.userRepo.find({
+      where: [
+        { role: UserRole.CEO, is_active: true },
+        { role: UserRole.GENERAL_MANAGER, is_active: true },
+      ],
+    });
+
+    for (const leader of ceoGmUsers) {
+      if (leader.id === reviewerUserId) continue;
+      if (leader.id === task.assigned_to_user_id) continue;
+      await this.createNotification({
+        user_id: leader.id,
+        from_user_id: reviewerUserId,
+        resource_id: saved.id,
+        resource_type: ResourceType.RATE,
+        parent_id: taskId,
+        parent_type: ParentType.DESIGNER_TASK,
+        type: "A designer task rating has been updated",
+      });
+    }
+
     const reloaded = await this.taskReviewRepo.findOne({
       where: { id: saved.id },
       relations: ["reviewer_user"],
