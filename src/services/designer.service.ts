@@ -238,6 +238,21 @@ export class DesignerService {
 
     // Batch-fetch task-level reviews (ratings)
     const taskReviews = await this.batchTaskReviews(taskIds);
+
+    const rateNotifications = await this.notificationRepo.find({
+      where: {
+        user_id: currentUser.id,
+        parent_id: In(taskIds) as any,
+        resource_type: ResourceType.RATE,
+        viewed: false,
+      },
+    });
+
+    const rateNotifByReviewId = new Map<string, { notificationId: string }>();
+    for (const n of rateNotifications) {
+      rateNotifByReviewId.set(n.resource_id, { notificationId: n.id });
+    }
+
     const appTimestamps = await this.batchLatestApplicationTimestamps(taskIds);
 
     const appliedStatuses = currentUser.role === UserRole.DESIGNER
@@ -288,7 +303,9 @@ export class DesignerService {
           taskNotification,
           submissionsWithReviews: restSwr,
           hasNestedNotification,
-          taskReview: taskReviews[task.id] || null,
+          taskReview: taskReviews[task.id]
+            ? { ...taskReviews[task.id], viewed: !rateNotifByReviewId.has(taskReviews[task.id].id), notificationId: rateNotifByReviewId.get(taskReviews[task.id].id)?.notificationId ?? null }
+            : null,
           applied: appliedStatuses[task.id]?.applied || false,
           coverNote: appliedStatuses[task.id]?.coverNote || null,
           applicationId: appliedStatuses[task.id]?.applicationId || null,
@@ -2002,6 +2019,15 @@ export class DesignerService {
     const submissionsByTask = await this.batchSubmissionsWithReviews(taskIds, userId);
     const taskReviews = await this.batchTaskReviews(taskIds);
 
+    const rateNotif = await this.notificationRepo.findOne({
+      where: {
+        user_id: userId,
+        parent_id: taskId,
+        resource_type: ResourceType.RATE,
+        viewed: false,
+      } as any,
+    });
+
     const swr = submissionsByTask[updated.id] || { taskNotification: { hasNotification: false, notificationId: null }, caseStudy: [], designing: [], rendering: [], finalStage: [] };
     const { taskNotification, ...restSwr } = swr;
     const hasNestedNotification =
@@ -2015,7 +2041,9 @@ export class DesignerService {
       taskNotification,
       submissionsWithReviews: restSwr,
       hasNestedNotification,
-      taskReview: taskReviews[updated.id] || null,
+      taskReview: taskReviews[updated.id]
+        ? { ...taskReviews[updated.id], viewed: !rateNotif, notificationId: rateNotif?.id ?? null }
+        : null,
     } as any;
   }
 
@@ -2042,6 +2070,15 @@ export class DesignerService {
     const submissionsByTask = await this.batchSubmissionsWithReviews(taskIds, userId);
     const taskReviews = await this.batchTaskReviews(taskIds);
 
+    const rateNotif = await this.notificationRepo.findOne({
+      where: {
+        user_id: userId,
+        parent_id: taskId,
+        resource_type: ResourceType.RATE,
+        viewed: false,
+      } as any,
+    });
+
     const swr = submissionsByTask[updated.id] || { taskNotification: { hasNotification: false, notificationId: null }, caseStudy: [], designing: [], rendering: [], finalStage: [] };
     const { taskNotification, ...restSwr } = swr;
     const hasNestedNotification =
@@ -2055,7 +2092,9 @@ export class DesignerService {
       taskNotification,
       submissionsWithReviews: restSwr,
       hasNestedNotification,
-      taskReview: taskReviews[updated.id] || null,
+      taskReview: taskReviews[updated.id]
+        ? { ...taskReviews[updated.id], viewed: !rateNotif, notificationId: rateNotif?.id ?? null }
+        : null,
     } as any;
   }
 }
