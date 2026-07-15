@@ -35,9 +35,9 @@ export const ROLE_RESOURCE_FILTERS: Record<string, DomainFilterConfig> = {
   designerTasks: {
     parentType: ParentType.DESIGNER_TASK,
     filters: {
-      [UserRole.DESIGNER]: [ResourceType.TASK_ASSIGNED, ResourceType.REVIEW],
-      [UserRole.GENERAL_MANAGER]: [ResourceType.SUBMISSION, ResourceType.REVIEW],
-      [UserRole.CEO]: [ResourceType.SUBMISSION, ResourceType.REVIEW],
+      [UserRole.DESIGNER]: [ResourceType.TASK_ASSIGNED, ResourceType.REVIEW, ResourceType.RATE],
+      [UserRole.GENERAL_MANAGER]: [ResourceType.SUBMISSION, ResourceType.REVIEW, ResourceType.RATE],
+      [UserRole.CEO]: [ResourceType.SUBMISSION, ResourceType.REVIEW, ResourceType.RATE],
     },
   },
   designerJobPostings: {
