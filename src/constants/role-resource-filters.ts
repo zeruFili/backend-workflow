@@ -27,7 +27,7 @@ export const ROLE_RESOURCE_FILTERS: Record<string, DomainFilterConfig> = {
   quantitySurveyorTasks: {
     parentType: ParentType.QUANTITY_SURVEYOR_TASK,
     filters: {
-      [UserRole.QUANTITY_SURVEYOR]: [ResourceType.REVIEW],
+      [UserRole.QUANTITY_SURVEYOR]: [ResourceType.TASK_ASSIGNED, ResourceType.REVIEW],
       [UserRole.GENERAL_MANAGER]: [ResourceType.SUBMISSION, ResourceType.REVIEW],
       [UserRole.CEO]: [ResourceType.SUBMISSION, ResourceType.REVIEW],
     },
