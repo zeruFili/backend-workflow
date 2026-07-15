@@ -907,7 +907,26 @@ export class DesignerService {
             type: "New designer application submitted",
           });
         }
-        return saved;
+    return saved;
+
+    const reloaded = await this.taskReviewRepo.findOne({
+      where: { id: saved.id },
+      relations: ["reviewer_user"],
+    });
+    return {
+      id: reloaded!.id,
+      reviewerName: reloaded!.reviewer_user?.full_name ?? "Unknown",
+      reviewer_user: pickSafeUserFields(reloaded!.reviewer_user ?? null),
+      reviewText: reloaded!.description ?? "",
+      ratings: {
+        creativity: reloaded!.creativity,
+        timeliness: reloaded!.timeliness,
+        rendering: reloaded!.rendering_quality,
+        clientUnderstanding: reloaded!.client_understanding,
+      },
+      submittedAt: reloaded!.created_at?.toISOString() ?? null,
+      updatedAt: reloaded!.updated_at?.toISOString() ?? null,
+    };
       }
       throw new AppError(409, "You have already applied for this task");
     }
@@ -1354,7 +1373,24 @@ export class DesignerService {
       });
     }
 
-    return saved;
+    const reloaded = await this.taskReviewRepo.findOne({
+      where: { id: saved.id },
+      relations: ["reviewer_user"],
+    });
+    return {
+      id: reloaded!.id,
+      reviewerName: reloaded!.reviewer_user?.full_name ?? "Unknown",
+      reviewer_user: pickSafeUserFields(reloaded!.reviewer_user ?? null),
+      reviewText: reloaded!.description ?? "",
+      ratings: {
+        creativity: reloaded!.creativity,
+        timeliness: reloaded!.timeliness,
+        rendering: reloaded!.rendering_quality,
+        clientUnderstanding: reloaded!.client_understanding,
+      },
+      submittedAt: reloaded!.created_at?.toISOString() ?? null,
+      updatedAt: reloaded!.updated_at?.toISOString() ?? null,
+    };
   }
 
   async updateTaskReview(
@@ -1441,7 +1477,24 @@ export class DesignerService {
       });
     }
 
-    return saved;
+    const reloaded = await this.taskReviewRepo.findOne({
+      where: { id: saved.id },
+      relations: ["reviewer_user"],
+    });
+    return {
+      id: reloaded!.id,
+      reviewerName: reloaded!.reviewer_user?.full_name ?? "Unknown",
+      reviewer_user: pickSafeUserFields(reloaded!.reviewer_user ?? null),
+      reviewText: reloaded!.description ?? "",
+      ratings: {
+        creativity: reloaded!.creativity,
+        timeliness: reloaded!.timeliness,
+        rendering: reloaded!.rendering_quality,
+        clientUnderstanding: reloaded!.client_understanding,
+      },
+      submittedAt: reloaded!.created_at?.toISOString() ?? null,
+      updatedAt: reloaded!.updated_at?.toISOString() ?? null,
+    };
   }
 
   async getDesignerPerformance(query: {
