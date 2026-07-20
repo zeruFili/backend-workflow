@@ -304,7 +304,7 @@ export class DesignerService {
           submissionsWithReviews: restSwr,
           hasNestedNotification,
           taskReview: taskReviews[task.id]
-            ? { ...taskReviews[task.id], viewed: !rateNotifByReviewId.has(taskReviews[task.id].id), notificationId: rateNotifByReviewId.get(taskReviews[task.id].id)?.notificationId ?? null }
+            ? { ...taskReviews[task.id], hasNotification: rateNotifByReviewId.has(taskReviews[task.id].id), notificationId: rateNotifByReviewId.get(taskReviews[task.id].id)?.notificationId ?? null }
             : null,
           applied: appliedStatuses[task.id]?.applied || false,
           coverNote: appliedStatuses[task.id]?.coverNote || null,
@@ -2043,7 +2043,7 @@ export class DesignerService {
       submissionsWithReviews: restSwr,
       hasNestedNotification,
       taskReview: taskReviews[updated.id]
-        ? { ...taskReviews[updated.id], viewed: !rateNotif, notificationId: rateNotif?.id ?? null }
+        ? { ...taskReviews[updated.id], hasNotification: !!rateNotif, notificationId: rateNotif?.id ?? null }
         : null,
     } as any;
   }
@@ -2094,7 +2094,7 @@ export class DesignerService {
       submissionsWithReviews: restSwr,
       hasNestedNotification,
       taskReview: taskReviews[updated.id]
-        ? { ...taskReviews[updated.id], viewed: !rateNotif, notificationId: rateNotif?.id ?? null }
+        ? { ...taskReviews[updated.id], hasNotification: !!rateNotif, notificationId: rateNotif?.id ?? null }
         : null,
     } as any;
   }
