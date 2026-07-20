@@ -20,24 +20,24 @@ export const ROLE_RESOURCE_FILTERS: Record<string, DomainFilterConfig> = {
     parentType: ParentType.DATA_COLLECTOR_TASK,
     filters: {
       [UserRole.DATA_COLLECTOR]: [ResourceType.TASK_ASSIGNED, ResourceType.REVIEW],
-      [UserRole.GENERAL_MANAGER]: [ResourceType.SUBMISSION, ResourceType.REVIEW],
-      [UserRole.CEO]: [ResourceType.SUBMISSION, ResourceType.REVIEW],
+      [UserRole.GENERAL_MANAGER]: [ResourceType.TASK_ASSIGNED, ResourceType.SUBMISSION, ResourceType.REVIEW],
+      [UserRole.CEO]: [ResourceType.TASK_ASSIGNED, ResourceType.SUBMISSION, ResourceType.REVIEW],
     },
   },
   quantitySurveyorTasks: {
     parentType: ParentType.QUANTITY_SURVEYOR_TASK,
     filters: {
       [UserRole.QUANTITY_SURVEYOR]: [ResourceType.TASK_ASSIGNED, ResourceType.REVIEW],
-      [UserRole.GENERAL_MANAGER]: [ResourceType.SUBMISSION, ResourceType.REVIEW],
-      [UserRole.CEO]: [ResourceType.SUBMISSION, ResourceType.REVIEW],
+      [UserRole.GENERAL_MANAGER]: [ResourceType.TASK_ASSIGNED, ResourceType.SUBMISSION, ResourceType.REVIEW],
+      [UserRole.CEO]: [ResourceType.TASK_ASSIGNED, ResourceType.SUBMISSION, ResourceType.REVIEW],
     },
   },
   designerTasks: {
     parentType: ParentType.DESIGNER_TASK,
     filters: {
       [UserRole.DESIGNER]: [ResourceType.TASK_ASSIGNED, ResourceType.REVIEW, ResourceType.RATE],
-      [UserRole.GENERAL_MANAGER]: [ResourceType.SUBMISSION, ResourceType.REVIEW, ResourceType.RATE],
-      [UserRole.CEO]: [ResourceType.SUBMISSION, ResourceType.REVIEW, ResourceType.RATE],
+      [UserRole.GENERAL_MANAGER]: [ResourceType.TASK_ASSIGNED, ResourceType.SUBMISSION, ResourceType.REVIEW, ResourceType.RATE],
+      [UserRole.CEO]: [ResourceType.TASK_ASSIGNED, ResourceType.SUBMISSION, ResourceType.REVIEW, ResourceType.RATE],
     },
   },
   designerJobPostings: {

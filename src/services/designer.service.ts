@@ -349,6 +349,7 @@ export class DesignerService {
 
     const notificationMap = new Map<string, string>();
     for (const n of unreadNotifications) {
+      if (n.resource_type === ResourceType.POSTED_JOB) continue;
       if (!notificationMap.has(n.resource_id)) {
         notificationMap.set(n.resource_id, n.id);
       }
