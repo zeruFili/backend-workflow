@@ -1,7 +1,7 @@
-import { IsString, Length } from "class-validator";
+import { IsEmail, IsString, Length, Matches } from "class-validator";
 
 export class LoginDto {
-  @IsString()
+  @IsEmail()
   @Length(1, 255)
   email: string;
 
@@ -11,12 +11,16 @@ export class LoginDto {
 }
 
 export class ForgotPasswordDto {
-  @IsString()
+  @IsEmail()
   email: string;
 }
 
 export class ResetPasswordDto {
   @IsString()
   @Length(8, 128)
-  newPassword: string;
+  password: string;
+
+  @IsString()
+  @Length(8, 128)
+  confirmPassword: string;
 }

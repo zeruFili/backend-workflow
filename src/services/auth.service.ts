@@ -1,16 +1,20 @@
 import bcrypt from "bcryptjs";
+import crypto from "crypto";
 import jwt from "jsonwebtoken";
 import { AppDataSource } from "../config/data-source";
 import { User } from "../entities/User";
+import { PasswordResetToken } from "../entities/PasswordResetToken";
 import { AppError } from "../middlewares/error.middleware";
 import { pickSafeUserFields, SafeUserOutput } from "../utils/response.utils";
 import { getUserDetails, UserDetails } from "../utils/user-details.util";
+import { validatePasswordStrength } from "../utils/password.utils";
+import { emailService } from "./email.service";
 
 const userRepo = () => AppDataSource.getRepository(User);
+const resetTokenRepo = () => AppDataSource.getRepository(PasswordResetToken);
 
 const JWT_SECRET = process.env.JWT_SECRET || "default_secret";
 const ACCESS_TOKEN_TTL = (process.env.ACCESS_TOKEN_TTL || "15m") as jwt.SignOptions["expiresIn"];
-const RESET_TOKEN_TTL = (process.env.RESET_TOKEN_TTL || "1h") as jwt.SignOptions["expiresIn"];
 const parsedBcryptCost = Number(process.env.BCRYPT_COST);
 const BCRYPT_COST = Number.isFinite(parsedBcryptCost) && parsedBcryptCost > 0 ? parsedBcryptCost : 12;
 
@@ -30,6 +34,10 @@ function generateAccessToken(user: {
 
 function sanitizeUser(user: User): SafeUserOutput {
   return pickSafeUserFields(user)!;
+}
+
+function hashToken(rawToken: string): string {
+  return bcrypt.hashSync(rawToken, 10);
 }
 
 export class AuthService {
@@ -68,26 +76,72 @@ export class AuthService {
 
   async forgotPassword(email: string): Promise<void> {
     const user = await userRepo().findOne({ where: { email } });
+
     if (!user) {
       return;
     }
 
-    const resetToken = jwt.sign(
-      { sub: user.id, purpose: "password_reset" },
-      JWT_SECRET,
-      { expiresIn: RESET_TOKEN_TTL }
-    );
+    await resetTokenRepo().delete({ userId: user.id, used: false });
+
+    const rawToken = crypto.randomBytes(32).toString("hex");
+    const tokenHash = hashToken(rawToken);
+
+    const resetToken = resetTokenRepo().create({
+      userId: user.id,
+      tokenHash,
+      expiresAt: new Date(Date.now() + 30 * 60 * 1000),
+      used: false,
+    });
+    await resetTokenRepo().save(resetToken);
+
+    await emailService.sendPasswordResetEmail(user.email, user.full_name, rawToken);
   }
 
-  async resetPassword(userId: string, newPassword: string): Promise<void> {
-    const user = await userRepo().findOne({ where: { id: userId } });
-    if (!user) {
-      throw new AppError(404, "User not found");
+  async resetPassword(rawToken: string, password: string, confirmPassword: string): Promise<void> {
+    if (password !== confirmPassword) {
+      throw new AppError(400, "Passwords do not match");
     }
 
-    user.password_hash = await bcrypt.hash(newPassword, BCRYPT_COST);
+    const passwordValidation = validatePasswordStrength(password);
+    if (!passwordValidation.valid) {
+      throw new AppError(400, passwordValidation.errors.join("; "));
+    }
+
+    const tokens = await resetTokenRepo().find({
+      where: { used: false },
+      order: { createdAt: "DESC" },
+    });
+
+    let matchedToken: PasswordResetToken | null = null;
+    for (const t of tokens) {
+      const isMatch = await bcrypt.compare(rawToken, t.tokenHash);
+      if (isMatch) {
+        matchedToken = t;
+        break;
+      }
+    }
+
+    if (!matchedToken) {
+      throw new AppError(400, "Password reset link is invalid or has already been used.");
+    }
+
+    if (new Date() > new Date(matchedToken.expiresAt)) {
+      matchedToken.used = true;
+      await resetTokenRepo().save(matchedToken);
+      throw new AppError(400, "Password reset link has expired. Please request a new one.");
+    }
+
+    const user = await userRepo().findOne({ where: { id: matchedToken.userId } });
+    if (!user) {
+      throw new AppError(400, "Password reset link is invalid.");
+    }
+
+    user.password_hash = await bcrypt.hash(password, BCRYPT_COST);
     user.updated_at = new Date();
     await userRepo().save(user);
+
+    matchedToken.used = true;
+    await resetTokenRepo().save(matchedToken);
   }
 
   async getMe(userId: string): Promise<UserDetails> {

@@ -17,3 +17,4 @@ export { MarketingTask } from "./MarketingTask";
 export { MarketingSubmission } from "./MarketingSubmission";
 export { MarketingReview } from "./MarketingReview";
 export { Notification } from "./Notification";
+export { PasswordResetToken } from "./PasswordResetToken";

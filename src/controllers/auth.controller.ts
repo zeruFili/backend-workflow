@@ -9,7 +9,6 @@ import { LoginDto, ForgotPasswordDto, ResetPasswordDto } from "../validators/aut
 export class AuthController {
   async login(req: Request, res: Response): Promise<void> {
     try {
-      console.log("Login request body:", req.body);
       const dto = plainToInstance(LoginDto, req.body);
       const errors = await validate(dto);
       if (errors.length > 0) {
@@ -35,28 +34,35 @@ export class AuthController {
       const dto = plainToInstance(ForgotPasswordDto, req.body);
       const errors = await validate(dto);
       if (errors.length > 0) {
-        const messages = errors.map((e) => Object.values(e.constraints ?? {})).flat();
-        res.status(400).json({ success: false, message: "Validation failed", errors: messages });
+        res.status(200).json({
+          success: true,
+          message: "If an account exists with this email, a password reset link has been sent.",
+        });
         return;
       }
 
       await authService.forgotPassword(dto.email);
       res.status(200).json({
         success: true,
-        message: "If an account with that email exists, a password reset link has been sent.",
+        message: "If an account exists with this email, a password reset link has been sent.",
       });
     } catch (err) {
-      if (err instanceof AppError) {
-        res.status(err.statusCode).json({ success: false, message: err.message });
-        return;
-      }
       console.error("Forgot password error:", err);
-      res.status(500).json({ success: false, message: "Internal server error" });
+      res.status(200).json({
+        success: true,
+        message: "If an account exists with this email, a password reset link has been sent.",
+      });
     }
   }
 
-  async resetPassword(req: AuthRequest, res: Response): Promise<void> {
+  async resetPassword(req: Request, res: Response): Promise<void> {
     try {
+      const token = req.params.token as string;
+      if (!token) {
+        res.status(400).json({ success: false, message: "Reset token is required" });
+        return;
+      }
+
       const dto = plainToInstance(ResetPasswordDto, req.body);
       const errors = await validate(dto);
       if (errors.length > 0) {
@@ -65,12 +71,7 @@ export class AuthController {
         return;
       }
 
-      if (!req.user) {
-        res.status(401).json({ success: false, message: "Unauthorized" });
-        return;
-      }
-
-      await authService.resetPassword(req.user.id, dto.newPassword);
+      await authService.resetPassword(token, dto.password, dto.confirmPassword);
       res.status(200).json({ success: true, message: "Password has been reset successfully. Please log in." });
     } catch (err) {
       if (err instanceof AppError) {
