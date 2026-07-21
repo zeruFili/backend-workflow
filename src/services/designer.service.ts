@@ -255,6 +255,14 @@ export class DesignerService {
 
     const appTimestamps = await this.batchLatestApplicationTimestamps(taskIds);
 
+    const taskReviewActivityTs: Record<string, number> = {};
+    for (const [taskId, review] of Object.entries(taskReviews)) {
+      taskReviewActivityTs[taskId] = Math.max(
+        review._submittedAtTs ?? 0,
+        review._updatedAtTs ?? 0,
+      );
+    }
+
     const appliedStatuses = currentUser.role === UserRole.DESIGNER
       ? await this.batchApplicationDetails(taskIds, currentUser.id)
       : {};
@@ -266,14 +274,16 @@ export class DesignerService {
         a.updated_at?.getTime() ?? 0,
         a.assigned_at?.getTime() ?? 0,
         submissionsByTask[a.id]?.latestActivityTs ?? 0,
-        appTimestamps[a.id] ?? 0
+        appTimestamps[a.id] ?? 0,
+        taskReviewActivityTs[a.id] ?? 0,
       );
       const bTs = Math.max(
         b.created_at.getTime(),
         b.updated_at?.getTime() ?? 0,
         b.assigned_at?.getTime() ?? 0,
         submissionsByTask[b.id]?.latestActivityTs ?? 0,
-        appTimestamps[b.id] ?? 0
+        appTimestamps[b.id] ?? 0,
+        taskReviewActivityTs[b.id] ?? 0,
       );
       return bTs - aTs;
     });
@@ -304,7 +314,17 @@ export class DesignerService {
           submissionsWithReviews: restSwr,
           hasNestedNotification,
           taskReview: taskReviews[task.id]
-            ? { ...taskReviews[task.id], hasNotification: rateNotifByReviewId.has(taskReviews[task.id].id), notificationId: rateNotifByReviewId.get(taskReviews[task.id].id)?.notificationId ?? null }
+            ? {
+                id: taskReviews[task.id].id,
+                reviewerName: taskReviews[task.id].reviewerName,
+                reviewer_user: taskReviews[task.id].reviewer_user,
+                reviewText: taskReviews[task.id].reviewText,
+                ratings: taskReviews[task.id].ratings,
+                submittedAt: taskReviews[task.id].submittedAt,
+                updatedAt: taskReviews[task.id].updatedAt,
+                hasNotification: rateNotifByReviewId.has(taskReviews[task.id].id),
+                notificationId: rateNotifByReviewId.get(taskReviews[task.id].id)?.notificationId ?? null,
+              }
             : null,
           applied: appliedStatuses[task.id]?.applied || false,
           coverNote: appliedStatuses[task.id]?.coverNote || null,
@@ -480,6 +500,8 @@ export class DesignerService {
         },
         submittedAt: review.created_at?.toISOString() ?? null,
         updatedAt: review.updated_at?.toISOString() ?? null,
+        _submittedAtTs: review.created_at?.getTime() ?? 0,
+        _updatedAtTs: review.updated_at?.getTime() ?? 0,
       };
     }
     return result;
