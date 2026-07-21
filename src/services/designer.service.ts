@@ -1463,6 +1463,8 @@ export class DesignerService {
       review.reviewer_user_id = currentUserId;
     }
 
+    review.updated_at = new Date();
+
     const saved = await this.taskReviewRepo.save(review);
 
     const task = review.designer_task;
