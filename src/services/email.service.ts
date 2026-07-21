@@ -5,17 +5,19 @@ const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST || "smtp.gmail.com",
   port: Number(process.env.SMTP_PORT) || 587,
   secure: process.env.SMTP_SECURE === "true",
-    auth: {
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASSWORD,
-    },
+  auth: {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASSWORD,
+  },
 });
 
 const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:5173";
 
 export class EmailService {
   async sendPasswordResetEmail(to: string, userName: string, rawToken: string): Promise<void> {
+    // const resetUrl = `${FRONTEND_URL}/workflow-managment/#/reset-password/${rawToken}`; 
     const resetUrl = `${FRONTEND_URL}/reset-password/${rawToken}`;
+
 
     const mailOptions = {
       from: `"Wase Workflow" <${process.env.EMAIL_USER}>`,
