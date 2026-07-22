@@ -223,15 +223,41 @@ export class DesignerService {
     if (isPublic !== undefined) qb.andWhere("t.is_public = :isPublic", { isPublic });
     if (isPaused !== undefined) qb.andWhere("t.is_paused = :isPaused", { isPaused });
 
+    let similarityScores: Record<string, number> = {};
+
     if (search) {
-      qb.andWhere("(t.title ILIKE :search OR t.description ILIKE :search)", {
-        search: `%${search}%`,
-      });
+      const searchPattern = `%${search}%`;
+      qb.addSelect(
+        `GREATEST(word_similarity(:searchTerm::text, t.title), word_similarity(:searchTerm::text, t.description))`,
+        "search_relevance"
+      );
+      qb.andWhere(
+        `(t.title ILIKE :searchPattern OR t.description ILIKE :searchPattern ` +
+        `OR word_similarity(:searchTerm::text, t.title) > 0.2 ` +
+        `OR word_similarity(:searchTerm::text, t.description) > 0.2)`,
+        { searchPattern, searchTerm: search }
+      );
+    } else {
+      qb.orderBy("t.created_at", "DESC");
     }
 
-    qb.orderBy("t.created_at", "DESC");
+    let data: DesignerTask[];
+    let total: number;
 
-    const [data, total] = await qb.getManyAndCount();
+    if (search) {
+      const result = await qb.getRawAndEntities();
+      data = result.entities;
+      total = result.entities.length;
+      result.raw.forEach((r: any, i: number) => {
+        if (result.entities[i]) {
+          similarityScores[result.entities[i].id] = Number(r.search_relevance) || 0;
+        }
+      });
+    } else {
+      const [entities, count] = await qb.getManyAndCount();
+      data = entities;
+      total = count;
+    }
 
     const taskIds = data.map((t) => t.id);
     const submissionsByTask = await this.batchSubmissionsWithReviews(taskIds, currentUser.id);
@@ -267,26 +293,54 @@ export class DesignerService {
       ? await this.batchApplicationDetails(taskIds, currentUser.id)
       : {};
 
-    // Sort by latest activity (task, submission, review, application, or assignment timestamps) descending
-    data.sort((a, b) => {
-      const aTs = Math.max(
-        a.created_at.getTime(),
-        a.updated_at?.getTime() ?? 0,
-        a.assigned_at?.getTime() ?? 0,
-        submissionsByTask[a.id]?.latestActivityTs ?? 0,
-        appTimestamps[a.id] ?? 0,
-        taskReviewActivityTs[a.id] ?? 0,
-      );
-      const bTs = Math.max(
-        b.created_at.getTime(),
-        b.updated_at?.getTime() ?? 0,
-        b.assigned_at?.getTime() ?? 0,
-        submissionsByTask[b.id]?.latestActivityTs ?? 0,
-        appTimestamps[b.id] ?? 0,
-        taskReviewActivityTs[b.id] ?? 0,
-      );
-      return bTs - aTs;
-    });
+    // Sort: if search is active, rank by similarity score (highest first);
+    // otherwise sort by latest activity (newest first)
+    if (search) {
+      data.sort((a, b) => {
+        const aScore = similarityScores[a.id] ?? 0;
+        const bScore = similarityScores[b.id] ?? 0;
+        // Primary: similarity score descending
+        if (aScore !== bScore) return bScore - aScore;
+        // Tiebreaker: latest activity descending
+        const aTs = Math.max(
+          a.created_at.getTime(),
+          a.updated_at?.getTime() ?? 0,
+          a.assigned_at?.getTime() ?? 0,
+          submissionsByTask[a.id]?.latestActivityTs ?? 0,
+          appTimestamps[a.id] ?? 0,
+          taskReviewActivityTs[a.id] ?? 0,
+        );
+        const bTs = Math.max(
+          b.created_at.getTime(),
+          b.updated_at?.getTime() ?? 0,
+          b.assigned_at?.getTime() ?? 0,
+          submissionsByTask[b.id]?.latestActivityTs ?? 0,
+          appTimestamps[b.id] ?? 0,
+          taskReviewActivityTs[b.id] ?? 0,
+        );
+        return bTs - aTs;
+      });
+    } else {
+      data.sort((a, b) => {
+        const aTs = Math.max(
+          a.created_at.getTime(),
+          a.updated_at?.getTime() ?? 0,
+          a.assigned_at?.getTime() ?? 0,
+          submissionsByTask[a.id]?.latestActivityTs ?? 0,
+          appTimestamps[a.id] ?? 0,
+          taskReviewActivityTs[a.id] ?? 0,
+        );
+        const bTs = Math.max(
+          b.created_at.getTime(),
+          b.updated_at?.getTime() ?? 0,
+          b.assigned_at?.getTime() ?? 0,
+          submissionsByTask[b.id]?.latestActivityTs ?? 0,
+          appTimestamps[b.id] ?? 0,
+          taskReviewActivityTs[b.id] ?? 0,
+        );
+        return bTs - aTs;
+      });
+    }
 
     // Apply pagination AFTER sorting by latest activity
     const skip = (page - 1) * limit;
