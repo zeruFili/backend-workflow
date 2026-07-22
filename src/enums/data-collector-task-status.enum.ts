@@ -1,5 +1,5 @@
 export enum DataCollectorTaskStatus {
-  APPROVE = "approve",
+  APPROVED = "approved",
   FEEDBACK = "feedback",
   REJECTED = "rejected",
   PENDING = "pending",

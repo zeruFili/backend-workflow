@@ -628,7 +628,7 @@ export class DataCollectorService {
     const saved = await this.reviewRepo.save(review);
 
     const mappedStatus = reviewOutcome === ReviewOutcome.APPROVED
-      ? DataCollectorTaskStatus.APPROVE
+      ? DataCollectorTaskStatus.APPROVED
       : reviewOutcome as unknown as DataCollectorTaskStatus;
     task.status = mappedStatus;
     task.updated_by = reviewerUserId as any;
@@ -733,7 +733,7 @@ export class DataCollectorService {
 
     if (params.review_outcome !== undefined) {
       const mappedStatus = params.review_outcome === ReviewOutcome.APPROVED
-        ? DataCollectorTaskStatus.APPROVE
+        ? DataCollectorTaskStatus.APPROVED
         : params.review_outcome as unknown as DataCollectorTaskStatus;
       task.status = mappedStatus;
       task.updated_by = currentUserId as any;
