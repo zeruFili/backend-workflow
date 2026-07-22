@@ -114,10 +114,6 @@ export class UserService {
   }
 
   async create(dto: CreateUserInput): Promise<UserDetails> {
-    if (dto.role === UserRole.CEO) {
-      throw new AppError(400, "Cannot create a user with CEO role");
-    }
-
     const existingEmail = await userRepo().findOne({ where: { email: dto.email } });
     if (existingEmail) {
       throw new AppError(409, "Email already exists");
