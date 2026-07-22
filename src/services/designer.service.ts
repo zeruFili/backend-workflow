@@ -210,8 +210,6 @@ export class DesignerService {
       .leftJoinAndSelect("t.assigned_to_user", "assigned_to_user")
       .leftJoinAndSelect("t.assigned_by_user", "assigned_by_user")
       .leftJoinAndSelect("t.updated_by_user", "updated_by_user")
-      .andWhere("t.task_state = :taskState", { taskState: TaskState.ACTIVE });
-
     this.applyTaskListVisibilityScope(qb, currentUser);
 
     if (status) qb.andWhere("t.status = :status", { status });
