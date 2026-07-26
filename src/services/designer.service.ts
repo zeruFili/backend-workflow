@@ -258,24 +258,36 @@ export class DesignerService {
     }
 
     const taskIds = data.map((t) => t.id);
-    const submissionsByTask = await this.batchSubmissionsWithReviews(taskIds, currentUser.id);
 
-    // Batch-fetch task-level reviews (ratings)
-    const taskReviews = await this.batchTaskReviews(taskIds);
-
-    const rateNotifications = await this.notificationRepo.find({
+    // Fetch all unread notifications for these tasks in ONE query
+    const unreadNotifications = await this.notificationRepo.find({
       where: {
         user_id: currentUser.id,
         parent_id: In(taskIds) as any,
-        resource_type: ResourceType.RATE,
         viewed: false,
       },
     });
 
+    // Build general notification map (resource_id → notificationId)
+    const notificationMap = new Map<string, string>();
+    // Build rate-specific notification map (reviewId → notificationId)
     const rateNotifByReviewId = new Map<string, { notificationId: string }>();
-    for (const n of rateNotifications) {
-      rateNotifByReviewId.set(n.resource_id, { notificationId: n.id });
+
+    for (const n of unreadNotifications) {
+      if (n.resource_type === ResourceType.POSTED_JOB) continue;
+      if (n.resource_type === ResourceType.RATE) {
+        rateNotifByReviewId.set(n.resource_id, { notificationId: n.id });
+      } else {
+        if (!notificationMap.has(n.resource_id)) {
+          notificationMap.set(n.resource_id, n.id);
+        }
+      }
     }
+
+    const submissionsByTask = await this.batchSubmissionsWithReviews(taskIds, notificationMap);
+
+    // Batch-fetch task-level reviews (ratings)
+    const taskReviews = await this.batchTaskReviews(taskIds);
 
     const appTimestamps = await this.batchLatestApplicationTimestamps(taskIds);
 
@@ -387,18 +399,21 @@ export class DesignerService {
     };
   }
 
-  private async batchSubmissionsWithReviews(taskIds: string[], userId: string): Promise<Record<string, any>> {
+  private async batchSubmissionsWithReviews(
+    taskIds: string[],
+    notificationMap: Map<string, string>,
+  ): Promise<Record<string, any>> {
     if (taskIds.length === 0) return {};
 
     const submissions = await this.submissionRepo.find({
-      where: taskIds.map((id) => ({ designer_task_id: id } as any)),
+      where: { designer_task_id: In(taskIds) },
     });
 
     const submissionIds = submissions.map((s) => s.id);
 
     const allReviews = submissionIds.length > 0
       ? await this.submissionReviewRepo.find({
-          where: submissionIds.map((id) => ({ designer_submission_id: id } as any)),
+          where: { designer_submission_id: In(submissionIds) },
           relations: ["reviewer_user"],
         })
       : [];
@@ -409,22 +424,6 @@ export class DesignerService {
         reviewsBySubmission[r.designer_submission_id] = [];
       }
       reviewsBySubmission[r.designer_submission_id].push(r);
-    }
-
-    const unreadNotifications = await this.notificationRepo.find({
-      where: {
-        user_id: userId,
-        parent_id: In(taskIds) as any,
-        viewed: false,
-      },
-    });
-
-    const notificationMap = new Map<string, string>();
-    for (const n of unreadNotifications) {
-      if (n.resource_type === ResourceType.POSTED_JOB) continue;
-      if (!notificationMap.has(n.resource_id)) {
-        notificationMap.set(n.resource_id, n.id);
-      }
     }
 
     const submissionsByTask: Record<string, DesignerSubmission[]> = {};
@@ -533,7 +532,7 @@ export class DesignerService {
     if (taskIds.length === 0) return {};
 
     const reviews = await this.taskReviewRepo.find({
-      where: taskIds.map((id) => ({ designer_task_id: id } as any)),
+      where: { designer_task_id: In(taskIds) },
       relations: ["reviewer_user"],
     });
 
@@ -585,7 +584,7 @@ export class DesignerService {
     if (taskIds.length === 0) return {};
 
     const apps = await this.applicationRepo.find({
-      where: taskIds.map((id) => ({ designer_task_id: id, applicant_user_id: userId, is_withdrawn: false } as any)),
+      where: { designer_task_id: In(taskIds), applicant_user_id: userId, is_withdrawn: false },
     });
 
     const result: Record<string, { applied: boolean; coverNote: string | null; applicationId: string }> = {};
@@ -2093,17 +2092,30 @@ export class DesignerService {
     if (!updated) throw new AppError(404, "Designer task not found");
 
     const taskIds = [updated.id];
-    const submissionsByTask = await this.batchSubmissionsWithReviews(taskIds, userId);
-    const taskReviews = await this.batchTaskReviews(taskIds);
 
-    const rateNotif = await this.notificationRepo.findOne({
+    const unreadNotifications = await this.notificationRepo.find({
       where: {
         user_id: userId,
-        parent_id: taskId,
-        resource_type: ResourceType.RATE,
+        parent_id: In(taskIds) as any,
         viewed: false,
-      } as any,
+      },
     });
+
+    const notificationMap = new Map<string, string>();
+    const rateNotifByReviewId = new Map<string, { notificationId: string }>();
+    for (const n of unreadNotifications) {
+      if (n.resource_type === ResourceType.POSTED_JOB) continue;
+      if (n.resource_type === ResourceType.RATE) {
+        rateNotifByReviewId.set(n.resource_id, { notificationId: n.id });
+      } else {
+        if (!notificationMap.has(n.resource_id)) {
+          notificationMap.set(n.resource_id, n.id);
+        }
+      }
+    }
+
+    const submissionsByTask = await this.batchSubmissionsWithReviews(taskIds, notificationMap);
+    const taskReviews = await this.batchTaskReviews(taskIds);
 
     const swr = submissionsByTask[updated.id] || { taskNotification: { hasNotification: false, notificationId: null }, caseStudy: [], designing: [], rendering: [], finalStage: [] };
     const { taskNotification, ...restSwr } = swr;
@@ -2119,7 +2131,7 @@ export class DesignerService {
       submissionsWithReviews: restSwr,
       hasNestedNotification,
       taskReview: taskReviews[updated.id]
-        ? { ...taskReviews[updated.id], hasNotification: !!rateNotif, notificationId: rateNotif?.id ?? null }
+        ? { ...taskReviews[updated.id], hasNotification: rateNotifByReviewId.has(taskReviews[updated.id].id), notificationId: rateNotifByReviewId.get(taskReviews[updated.id].id)?.notificationId ?? null }
         : null,
     } as any;
   }
@@ -2144,17 +2156,30 @@ export class DesignerService {
     if (!updated) throw new AppError(404, "Designer task not found");
 
     const taskIds = [updated.id];
-    const submissionsByTask = await this.batchSubmissionsWithReviews(taskIds, userId);
-    const taskReviews = await this.batchTaskReviews(taskIds);
 
-    const rateNotif = await this.notificationRepo.findOne({
+    const unreadNotifications = await this.notificationRepo.find({
       where: {
         user_id: userId,
-        parent_id: taskId,
-        resource_type: ResourceType.RATE,
+        parent_id: In(taskIds) as any,
         viewed: false,
-      } as any,
+      },
     });
+
+    const notificationMap = new Map<string, string>();
+    const rateNotifByReviewId = new Map<string, { notificationId: string }>();
+    for (const n of unreadNotifications) {
+      if (n.resource_type === ResourceType.POSTED_JOB) continue;
+      if (n.resource_type === ResourceType.RATE) {
+        rateNotifByReviewId.set(n.resource_id, { notificationId: n.id });
+      } else {
+        if (!notificationMap.has(n.resource_id)) {
+          notificationMap.set(n.resource_id, n.id);
+        }
+      }
+    }
+
+    const submissionsByTask = await this.batchSubmissionsWithReviews(taskIds, notificationMap);
+    const taskReviews = await this.batchTaskReviews(taskIds);
 
     const swr = submissionsByTask[updated.id] || { taskNotification: { hasNotification: false, notificationId: null }, caseStudy: [], designing: [], rendering: [], finalStage: [] };
     const { taskNotification, ...restSwr } = swr;
@@ -2170,7 +2195,7 @@ export class DesignerService {
       submissionsWithReviews: restSwr,
       hasNestedNotification,
       taskReview: taskReviews[updated.id]
-        ? { ...taskReviews[updated.id], hasNotification: !!rateNotif, notificationId: rateNotif?.id ?? null }
+        ? { ...taskReviews[updated.id], hasNotification: rateNotifByReviewId.has(taskReviews[updated.id].id), notificationId: rateNotifByReviewId.get(taskReviews[updated.id].id)?.notificationId ?? null }
         : null,
     } as any;
   }
