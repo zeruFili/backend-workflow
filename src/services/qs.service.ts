@@ -13,6 +13,7 @@ import { ResourceType } from "../enums/resource-type.enum";
 import { ParentType } from "../enums/parent-type.enum";
 import { AppError } from "../middlewares/error.middleware";
 import { pickSafeUserFields } from "../utils/response.utils";
+import { safeUserColumns } from "../utils/user-columns.utils";
 import { syncAttachments } from "../utils/upload.utils";
 
 interface PaginatedParams {
@@ -127,9 +128,12 @@ export class QuantitySurveyorService {
     const { page, limit, status, assignedTo, search, currentUser } = params;
 
     const qb = this.taskRepo.createQueryBuilder("t")
-      .leftJoinAndSelect("t.assigned_to_user", "assigned_to_user")
-      .leftJoinAndSelect("t.assigned_by_user", "assigned_by_user")
-      .leftJoinAndSelect("t.updated_by_user", "updated_by_user");
+      .leftJoin("t.assigned_to_user", "assigned_to_user")
+      .leftJoin("t.assigned_by_user", "assigned_by_user")
+      .leftJoin("t.updated_by_user", "updated_by_user")
+      .addSelect(safeUserColumns("assigned_to_user"))
+      .addSelect(safeUserColumns("assigned_by_user"))
+      .addSelect(safeUserColumns("updated_by_user"));
 
     if (currentUser.role === UserRole.CEO || currentUser.role === UserRole.GENERAL_MANAGER) {
       // CEO and GM see all tasks
@@ -251,10 +255,14 @@ export class QuantitySurveyorService {
     });
 
     const allReviews = submissions.length > 0
-      ? await this.reviewRepo.find({
-          where: submissions.map((s) => ({ quantity_surveyor_submission_id: s.id } as any)),
-          relations: ["reviewer_user"],
-        })
+      ? await this.reviewRepo
+          .createQueryBuilder("r")
+          .leftJoin("r.reviewer_user", "reviewer_user")
+          .addSelect(safeUserColumns("reviewer_user"))
+          .where("r.quantity_surveyor_submission_id IN (:...submissionIds)", {
+            submissionIds: submissions.map((s) => s.id),
+          })
+          .getMany()
       : [];
 
     const reviewsBySubmission: Record<string, QuantitySurveyorReview[]> = {};
@@ -362,10 +370,16 @@ export class QuantitySurveyorService {
   }
 
   async findTaskById(id: string, currentUser?: { id: string; role: UserRole }) {
-    const task = await this.taskRepo.findOne({
-      where: { id },
-      relations: ["assigned_to_user", "assigned_by_user", "updated_by_user"],
-    });
+    const task = await this.taskRepo
+      .createQueryBuilder("t")
+      .leftJoin("t.assigned_to_user", "assigned_to_user")
+      .leftJoin("t.assigned_by_user", "assigned_by_user")
+      .leftJoin("t.updated_by_user", "updated_by_user")
+      .addSelect(safeUserColumns("assigned_to_user"))
+      .addSelect(safeUserColumns("assigned_by_user"))
+      .addSelect(safeUserColumns("updated_by_user"))
+      .where("t.id = :id", { id })
+      .getOne();
     if (!task) throw new AppError(404, "Quantity surveyor task not found");
 
     if (currentUser) {
@@ -744,11 +758,13 @@ export class QuantitySurveyorService {
     const submission = await this.submissionRepo.findOneBy({ id: submissionId });
     if (!submission) throw new AppError(404, "Quantity surveyor submission not found");
 
-    const reviews = await this.reviewRepo.find({
-      where: { quantity_surveyor_submission_id: submissionId },
-      relations: ["reviewer_user"],
-      order: { created_at: "DESC" },
-    });
+    const reviews = await this.reviewRepo
+      .createQueryBuilder("r")
+      .leftJoin("r.reviewer_user", "reviewer_user")
+      .addSelect(safeUserColumns("reviewer_user"))
+      .where("r.quantity_surveyor_submission_id = :submissionId", { submissionId })
+      .orderBy("r.created_at", "DESC")
+      .getMany();
 
     return reviews.map((r) => ({
       ...r,

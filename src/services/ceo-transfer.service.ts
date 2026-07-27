@@ -3,6 +3,7 @@ import { CeoTransfer } from "../entities/CeoTransfer";
 import { Notification } from "../entities/Notification";
 import { AppError } from "../middlewares/error.middleware";
 import { pickSafeUserFields } from "../utils/response.utils";
+import { safeUserColumns } from "../utils/user-columns.utils";
 import { syncAttachments } from "../utils/upload.utils";
 import { getUserDetails } from "../utils/user-details.util";
 
@@ -31,8 +32,10 @@ export class CeoTransferService {
     const l = Math.min(100, Math.max(1, limit));
 
     const qb = this.repo.createQueryBuilder("ct")
-      .leftJoinAndSelect("ct.finance_user", "finance_user")
-      .leftJoinAndSelect("ct.ceo_user", "ceo_user")
+      .leftJoin("ct.finance_user", "finance_user")
+      .leftJoin("ct.ceo_user", "ceo_user")
+      .addSelect(safeUserColumns("finance_user"))
+      .addSelect(safeUserColumns("ceo_user"))
       .orderBy("ct.created_at", "DESC")
       .skip((p - 1) * l)
       .take(l);
@@ -64,10 +67,14 @@ export class CeoTransferService {
   }
 
   async findById(id: string) {
-    const transfer = await this.repo.findOne({
-      where: { id },
-      relations: ["finance_user", "ceo_user"],
-    });
+    const transfer = await this.repo
+      .createQueryBuilder("ct")
+      .leftJoin("ct.finance_user", "finance_user")
+      .leftJoin("ct.ceo_user", "ceo_user")
+      .addSelect(safeUserColumns("finance_user"))
+      .addSelect(safeUserColumns("ceo_user"))
+      .where("ct.id = :id", { id })
+      .getOne();
     if (!transfer) throw new AppError(404, "CEO transfer not found");
     return {
       ...transfer,

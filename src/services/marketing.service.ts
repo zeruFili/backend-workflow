@@ -11,6 +11,7 @@ import { ResourceType } from "../enums/resource-type.enum";
 import { ParentType } from "../enums/parent-type.enum";
 import { AppError } from "../middlewares/error.middleware";
 import { pickSafeUserFields } from "../utils/response.utils";
+import { safeUserColumns } from "../utils/user-columns.utils";
 import { syncAttachments } from "../utils/upload.utils";
 import { In } from "typeorm";
 
@@ -113,8 +114,10 @@ export class MarketingService {
     const { page, limit, status, search, currentUser } = params;
 
     const qb = this.taskRepo.createQueryBuilder("t")
-      .leftJoinAndSelect("t.marketing_user", "marketing_user")
-      .leftJoinAndSelect("t.updated_by_user", "updated_by_user");
+      .leftJoin("t.marketing_user", "marketing_user")
+      .leftJoin("t.updated_by_user", "updated_by_user")
+      .addSelect(safeUserColumns("marketing_user"))
+      .addSelect(safeUserColumns("updated_by_user"));
 
     if (currentUser.role === UserRole.CEO || currentUser.role === UserRole.FINANCE) {
       // CEO and Finance see all tasks
@@ -247,10 +250,14 @@ export class MarketingService {
     console.log(`[MarketingService] batchSubmissionsWithReviews found ${submissions.length} submissions`);
 
     const allReviews = submissions.length > 0
-      ? await this.reviewRepo.find({
-          where: { marketing_submission_id: In(submissions.map((s) => s.id)) },
-          relations: ["reviewer_user"],
-        })
+      ? await this.reviewRepo
+          .createQueryBuilder("r")
+          .leftJoin("r.reviewer_user", "reviewer_user")
+          .addSelect(safeUserColumns("reviewer_user"))
+          .where("r.marketing_submission_id IN (:...submissionIds)", {
+            submissionIds: submissions.map((s) => s.id),
+          })
+          .getMany()
       : [];
 
     const reviewsBySubmission: Record<string, MarketingReview[]> = {};
@@ -358,10 +365,14 @@ export class MarketingService {
   }
 
   async findTaskById(id: string, currentUser?: { id: string; role: UserRole }) {
-    const task = await this.taskRepo.findOne({
-      where: { id },
-      relations: ["marketing_user", "updated_by_user"],
-    });
+    const task = await this.taskRepo
+      .createQueryBuilder("t")
+      .leftJoin("t.marketing_user", "marketing_user")
+      .leftJoin("t.updated_by_user", "updated_by_user")
+      .addSelect(safeUserColumns("marketing_user"))
+      .addSelect(safeUserColumns("updated_by_user"))
+      .where("t.id = :id", { id })
+      .getOne();
     if (!task) throw new AppError(404, "Marketing task not found");
 
     if (currentUser) {
@@ -388,10 +399,14 @@ export class MarketingService {
 
     const reviewRepo = this.reviewRepo;
     const allReviews = submissions.length > 0
-      ? await reviewRepo.find({
-          where: submissions.map((s) => ({ marketing_submission_id: s.id } as any)),
-          relations: ["reviewer_user"],
-        })
+      ? await reviewRepo
+          .createQueryBuilder("r")
+          .leftJoin("r.reviewer_user", "reviewer_user")
+          .addSelect(safeUserColumns("reviewer_user"))
+          .where("r.marketing_submission_id IN (:...submissionIds)", {
+            submissionIds: submissions.map((s) => s.id),
+          })
+          .getMany()
       : [];
     console.log(`[MarketingService] findTaskById - found ${allReviews.length} reviews for task ${id}`);
 
@@ -797,11 +812,13 @@ export class MarketingService {
     const submission = await this.submissionRepo.findOneBy({ id: submissionId });
     if (!submission) throw new AppError(404, "Marketing submission not found");
 
-    const reviews = await this.reviewRepo.find({
-      where: { marketing_submission_id: submissionId },
-      relations: ["reviewer_user"],
-      order: { created_at: "DESC" },
-    });
+    const reviews = await this.reviewRepo
+      .createQueryBuilder("r")
+      .leftJoin("r.reviewer_user", "reviewer_user")
+      .addSelect(safeUserColumns("reviewer_user"))
+      .where("r.marketing_submission_id = :submissionId", { submissionId })
+      .orderBy("r.created_at", "DESC")
+      .getMany();
 
     return reviews.map((r) => ({
       ...r,

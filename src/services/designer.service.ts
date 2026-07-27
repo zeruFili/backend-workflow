@@ -17,6 +17,7 @@ import { ResourceType } from "../enums/resource-type.enum";
 import { ParentType } from "../enums/parent-type.enum";
 import { AppError } from "../middlewares/error.middleware";
 import { pickSafeUserFields } from "../utils/response.utils";
+import { safeUserColumns } from "../utils/user-columns.utils";
 import { syncAttachments } from "../utils/upload.utils";
 
 interface PaginatedParams {
@@ -244,10 +245,16 @@ export class DesignerService {
     // Phase 3: Load full task entities for the page subset only
     let data: DesignerTask[];
     if (taskIds.length > 0) {
-      data = await this.taskRepo.find({
-        where: { id: In(taskIds) },
-        relations: ["assigned_to_user", "assigned_by_user", "updated_by_user"],
-      });
+      data = await this.taskRepo
+        .createQueryBuilder("t")
+        .leftJoin("t.assigned_to_user", "assigned_to_user")
+        .leftJoin("t.assigned_by_user", "assigned_by_user")
+        .leftJoin("t.updated_by_user", "updated_by_user")
+        .addSelect(safeUserColumns("assigned_to_user"))
+        .addSelect(safeUserColumns("assigned_by_user"))
+        .addSelect(safeUserColumns("updated_by_user"))
+        .where("t.id IN (:...taskIds)", { taskIds })
+        .getMany();
 
       // Restore SQL sort order
       const idOrder: Record<string, number> = {};
@@ -475,10 +482,12 @@ export class DesignerService {
     const submissionIds = submissions.map((s) => s.id);
 
     const allReviews = submissionIds.length > 0
-      ? await this.submissionReviewRepo.find({
-          where: { designer_submission_id: In(submissionIds) },
-          relations: ["reviewer_user"],
-        })
+      ? await this.submissionReviewRepo
+          .createQueryBuilder("r")
+          .leftJoin("r.reviewer_user", "reviewer_user")
+          .addSelect(safeUserColumns("reviewer_user"))
+          .where("r.designer_submission_id IN (:...submissionIds)", { submissionIds })
+          .getMany()
       : [];
 
     const reviewsBySubmission: Record<string, DesignerSubmissionReview[]> = {};
@@ -594,10 +603,12 @@ export class DesignerService {
   private async batchTaskReviews(taskIds: string[]): Promise<Record<string, any>> {
     if (taskIds.length === 0) return {};
 
-    const reviews = await this.taskReviewRepo.find({
-      where: { designer_task_id: In(taskIds) },
-      relations: ["reviewer_user"],
-    });
+    const reviews = await this.taskReviewRepo
+      .createQueryBuilder("r")
+      .leftJoin("r.reviewer_user", "reviewer_user")
+      .addSelect(safeUserColumns("reviewer_user"))
+      .where("r.designer_task_id IN (:...taskIds)", { taskIds })
+      .getMany();
 
     const result: Record<string, any> = {};
     for (const review of reviews) {
@@ -636,10 +647,16 @@ export class DesignerService {
   }
 
   async findTaskById(id: string, currentUser?: { id: string; role: UserRole }) {
-    const task = await this.taskRepo.findOne({
-      where: { id },
-      relations: ["assigned_to_user", "assigned_by_user", "updated_by_user"],
-    });
+    const task = await this.taskRepo
+      .createQueryBuilder("t")
+      .leftJoin("t.assigned_to_user", "assigned_to_user")
+      .leftJoin("t.assigned_by_user", "assigned_by_user")
+      .leftJoin("t.updated_by_user", "updated_by_user")
+      .addSelect(safeUserColumns("assigned_to_user"))
+      .addSelect(safeUserColumns("assigned_by_user"))
+      .addSelect(safeUserColumns("updated_by_user"))
+      .where("t.id = :id", { id })
+      .getOne();
     if (!task) throw new AppError(404, "Designer task not found");
 
     if (currentUser) {
@@ -659,11 +676,13 @@ export class DesignerService {
       order: { created_at: "ASC" },
     });
 
-    const applications = await this.applicationRepo.find({
-      where: { designer_task_id: id },
-      relations: ["applicant_user"],
-      order: { created_at: "DESC" },
-    });
+    const applications = await this.applicationRepo
+      .createQueryBuilder("a")
+      .leftJoin("a.applicant_user", "applicant_user")
+      .addSelect(safeUserColumns("applicant_user"))
+      .where("a.designer_task_id = :taskId", { taskId: id })
+      .orderBy("a.created_at", "DESC")
+      .getMany();
 
     const sanitizedApplications = applications.map((a) => ({
       ...a,
@@ -903,10 +922,16 @@ export class DesignerService {
       });
     }
 
-    const enriched = await this.taskRepo.findOne({
-      where: { id },
-      relations: ["assigned_to_user", "assigned_by_user", "updated_by_user"],
-    });
+    const enriched = await this.taskRepo
+      .createQueryBuilder("t")
+      .leftJoin("t.assigned_to_user", "assigned_to_user")
+      .leftJoin("t.assigned_by_user", "assigned_by_user")
+      .leftJoin("t.updated_by_user", "updated_by_user")
+      .addSelect(safeUserColumns("assigned_to_user"))
+      .addSelect(safeUserColumns("assigned_by_user"))
+      .addSelect(safeUserColumns("updated_by_user"))
+      .where("t.id = :id", { id })
+      .getOne();
     if (!enriched) throw new AppError(404, "Designer task not found after update");
     return this.sanitizeDesignerTask(enriched);
   }
@@ -992,10 +1017,16 @@ export class DesignerService {
       );
     }
 
-    const saved = await this.taskRepo.findOne({
-      where: { id: taskId },
-      relations: ["assigned_to_user", "assigned_by_user", "updated_by_user"],
-    });
+    const saved = await this.taskRepo
+      .createQueryBuilder("t")
+      .leftJoin("t.assigned_to_user", "assigned_to_user")
+      .leftJoin("t.assigned_by_user", "assigned_by_user")
+      .leftJoin("t.updated_by_user", "updated_by_user")
+      .addSelect(safeUserColumns("assigned_to_user"))
+      .addSelect(safeUserColumns("assigned_by_user"))
+      .addSelect(safeUserColumns("updated_by_user"))
+      .where("t.id = :id", { id: taskId })
+      .getOne();
     if (!saved) throw new AppError(404, "Designer task not found after update");
     return saved;
   }
@@ -1144,7 +1175,8 @@ export class DesignerService {
     const { page, limit, taskId, applicantId, currentUser } = params;
 
     const qb = this.applicationRepo.createQueryBuilder("a")
-      .leftJoinAndSelect("a.applicant_user", "applicant_user")
+      .leftJoin("a.applicant_user", "applicant_user")
+      .addSelect(safeUserColumns("applicant_user"))
       .leftJoinAndSelect("a.designer_task", "designer_task");
 
     const isDesigner = currentUser.role === UserRole.DESIGNER;
@@ -1526,10 +1558,12 @@ export class DesignerService {
       });
     }
 
-    const reloaded = await this.taskReviewRepo.findOne({
-      where: { id: saved.id },
-      relations: ["reviewer_user"],
-    });
+    const reloaded = await this.taskReviewRepo
+      .createQueryBuilder("r")
+      .leftJoin("r.reviewer_user", "reviewer_user")
+      .addSelect(safeUserColumns("reviewer_user"))
+      .where("r.id = :id", { id: saved.id })
+      .getOne();
     return {
       id: reloaded!.id,
       reviewerName: reloaded!.reviewer_user?.full_name ?? "Unknown",
@@ -1632,10 +1666,12 @@ export class DesignerService {
       });
     }
 
-    const reloaded = await this.taskReviewRepo.findOne({
-      where: { id: saved.id },
-      relations: ["reviewer_user"],
-    });
+    const reloaded = await this.taskReviewRepo
+      .createQueryBuilder("r")
+      .leftJoin("r.reviewer_user", "reviewer_user")
+      .addSelect(safeUserColumns("reviewer_user"))
+      .where("r.id = :id", { id: saved.id })
+      .getOne();
     return {
       id: reloaded!.id,
       reviewerName: reloaded!.reviewer_user?.full_name ?? "Unknown",
@@ -1968,11 +2004,13 @@ export class DesignerService {
     const submission = await this.submissionRepo.findOneBy({ id: submissionId });
     if (!submission) throw new AppError(404, "Designer submission not found");
 
-    const reviews = await this.submissionReviewRepo.find({
-      where: { designer_submission_id: submissionId },
-      relations: ["reviewer_user"],
-      order: { created_at: "DESC" },
-    });
+    const reviews = await this.submissionReviewRepo
+      .createQueryBuilder("r")
+      .leftJoin("r.reviewer_user", "reviewer_user")
+      .addSelect(safeUserColumns("reviewer_user"))
+      .where("r.designer_submission_id = :submissionId", { submissionId })
+      .orderBy("r.created_at", "DESC")
+      .getMany();
 
     return reviews.map((r) => ({
       ...r,
@@ -2126,10 +2164,16 @@ export class DesignerService {
     task.updated_at = new Date();
     const saved = await this.taskRepo.save(task);
 
-    const updated = await this.taskRepo.findOne({
-      where: { id: taskId },
-      relations: ["assigned_to_user", "assigned_by_user", "updated_by_user"],
-    });
+    const updated = await this.taskRepo
+      .createQueryBuilder("t")
+      .leftJoin("t.assigned_to_user", "assigned_to_user")
+      .leftJoin("t.assigned_by_user", "assigned_by_user")
+      .leftJoin("t.updated_by_user", "updated_by_user")
+      .addSelect(safeUserColumns("assigned_to_user"))
+      .addSelect(safeUserColumns("assigned_by_user"))
+      .addSelect(safeUserColumns("updated_by_user"))
+      .where("t.id = :id", { id: taskId })
+      .getOne();
     if (!updated) throw new AppError(404, "Designer task not found");
 
     const taskIds = [updated.id];
@@ -2190,10 +2234,16 @@ export class DesignerService {
     task.updated_at = new Date();
     const saved = await this.taskRepo.save(task);
 
-    const updated = await this.taskRepo.findOne({
-      where: { id: taskId },
-      relations: ["assigned_to_user", "assigned_by_user", "updated_by_user"],
-    });
+    const updated = await this.taskRepo
+      .createQueryBuilder("t")
+      .leftJoin("t.assigned_to_user", "assigned_to_user")
+      .leftJoin("t.assigned_by_user", "assigned_by_user")
+      .leftJoin("t.updated_by_user", "updated_by_user")
+      .addSelect(safeUserColumns("assigned_to_user"))
+      .addSelect(safeUserColumns("assigned_by_user"))
+      .addSelect(safeUserColumns("updated_by_user"))
+      .where("t.id = :id", { id: taskId })
+      .getOne();
     if (!updated) throw new AppError(404, "Designer task not found");
 
     const taskIds = [updated.id];

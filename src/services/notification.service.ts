@@ -4,6 +4,7 @@ import { ResourceType } from "../enums/resource-type.enum";
 import { ParentType } from "../enums/parent-type.enum";
 import { AppError } from "../middlewares/error.middleware";
 import { pickSafeUserFields } from "../utils/response.utils";
+import { safeUserColumns } from "../utils/user-columns.utils";
 import { ROLE_RESOURCE_FILTERS } from "../constants/role-resource-filters";
 
 export class NotificationService {
@@ -34,13 +35,19 @@ export class NotificationService {
   async getUserNotifications(userId: string, page: number, limit: number, viewed?: boolean) {
     const skip = (page - 1) * limit;
 
-    const [data, total] = await this.repo.findAndCount({
-      where: { user_id: userId, ...(viewed !== undefined ? { viewed } : {}) } as any,
-      relations: ["from_user"],
-      order: { created_at: "DESC" },
-      skip,
-      take: limit,
-    });
+    const qb = this.repo.createQueryBuilder("n")
+      .leftJoin("n.from_user", "from_user")
+      .addSelect(safeUserColumns("from_user"))
+      .where("n.user_id = :userId", { userId })
+      .orderBy("n.created_at", "DESC")
+      .skip(skip)
+      .take(limit);
+
+    if (viewed !== undefined) {
+      qb.andWhere("n.viewed = :viewed", { viewed });
+    }
+
+    const [data, total] = await qb.getManyAndCount();
 
     const sanitized = data.map((n) => ({
       ...n,
