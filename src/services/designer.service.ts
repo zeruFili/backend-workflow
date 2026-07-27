@@ -205,72 +205,68 @@ export class DesignerService {
 
   async findAllTasks(params: PaginatedParams) {
     const { page, limit, status, assignedTo, isPublic, isPaused, search, currentUser } = params;
+    const skip = (page - 1) * limit;
 
-    const qb = this.taskRepo.createQueryBuilder("t")
-      .leftJoinAndSelect("t.assigned_to_user", "assigned_to_user")
-      .leftJoinAndSelect("t.assigned_by_user", "assigned_by_user")
-      .leftJoinAndSelect("t.updated_by_user", "updated_by_user")
-    this.applyTaskListVisibilityScope(qb, currentUser);
-
-    if (status) qb.andWhere("t.status = :status", { status });
-    if (assignedTo === null) {
-      qb.andWhere("t.assigned_to_user_id IS NULL");
-    } else if (assignedTo) {
-      qb.andWhere("t.assigned_to_user_id = :assignedTo", { assignedTo });
-    }
-    if (isPublic !== undefined) qb.andWhere("t.is_public = :isPublic", { isPublic });
-    if (isPaused !== undefined) qb.andWhere("t.is_paused = :isPaused", { isPaused });
-
-    let similarityScores: Record<string, number> = {};
-
-    if (search) {
-      const searchPattern = `%${search}%`;
-      qb.addSelect(
-        `GREATEST(word_similarity(:searchTerm::text, t.title), word_similarity(:searchTerm::text, t.description))`,
-        "search_relevance"
-      );
-      qb.andWhere(
-        `(t.title ILIKE :searchPattern OR t.description ILIKE :searchPattern ` +
-        `OR word_similarity(:searchTerm::text, t.title) > 0.2 ` +
-        `OR word_similarity(:searchTerm::text, t.description) > 0.2)`,
-        { searchPattern, searchTerm: search }
-      );
-    } else {
-      qb.orderBy("t.created_at", "DESC");
-    }
-
-    let data: DesignerTask[];
-    let total: number;
-
-    if (search) {
-      const result = await qb.getRawAndEntities();
-      data = result.entities;
-      total = result.entities.length;
-      result.raw.forEach((r: any, i: number) => {
-        if (result.entities[i]) {
-          similarityScores[result.entities[i].id] = Number(r.search_relevance) || 0;
-        }
-      });
-    } else {
-      const [entities, count] = await qb.getManyAndCount();
-      data = entities;
-      total = count;
-    }
-
-    const taskIds = data.map((t) => t.id);
-
-    // Fetch all unread notifications for these tasks in ONE query
-    const unreadNotifications = await this.notificationRepo.find({
-      where: {
-        user_id: currentUser.id,
-        parent_id: In(taskIds) as any,
-        viewed: false,
-      },
+    // Phase 1: Paginated ID query (DB-level LIMIT/OFFSET sorted by activity)
+    const { sql: idSql, params: idParams } = this.buildPaginatedIdQuery({
+      status,
+      assignedTo,
+      isPublic,
+      isPaused,
+      search,
+      currentUser,
+      skip,
+      limit,
     });
 
-    // Build general notification map (resource_id → notificationId)
+    const idRows: { id: string; search_relevance?: number }[] = await this.taskRepo.query(idSql, idParams);
+    const taskIds: string[] = [];
+    const similarityScores: Record<string, number> = {};
+    for (const row of idRows) {
+      taskIds.push(row.id);
+      if (search && row.search_relevance != null) {
+        similarityScores[row.id] = Number(row.search_relevance) || 0;
+      }
+    }
+
+    // Phase 2: Total count (lightweight, no LATERAL joins)
+    const { sql: countSql, params: countParams } = this.buildCountQuery({
+      status,
+      assignedTo,
+      isPublic,
+      isPaused,
+      search,
+      currentUser,
+    });
+    const countResult = await this.taskRepo.query(countSql, countParams);
+    const total: number = parseInt(countResult[0]?.count ?? "0", 10);
+
+    // Phase 3: Load full task entities for the page subset only
+    let data: DesignerTask[];
+    if (taskIds.length > 0) {
+      data = await this.taskRepo.find({
+        where: { id: In(taskIds) },
+        relations: ["assigned_to_user", "assigned_by_user", "updated_by_user"],
+      });
+
+      // Restore SQL sort order
+      const idOrder: Record<string, number> = {};
+      for (let i = 0; i < taskIds.length; i++) {
+        idOrder[taskIds[i]] = i;
+      }
+      data.sort((a, b) => (idOrder[a.id] ?? 0) - (idOrder[b.id] ?? 0));
+    } else {
+      data = [];
+    }
+
+    // Phase 4: Batch-fetch relations (only for page-sized subset)
+    const unreadNotifications = taskIds.length > 0
+      ? await this.notificationRepo.find({
+          where: { user_id: currentUser.id, parent_id: In(taskIds) as any, viewed: false },
+        })
+      : [];
+
     const notificationMap = new Map<string, string>();
-    // Build rate-specific notification map (reviewId → notificationId)
     const rateNotifByReviewId = new Map<string, { notificationId: string }>();
 
     for (const n of unreadNotifications) {
@@ -285,80 +281,16 @@ export class DesignerService {
     }
 
     const submissionsByTask = await this.batchSubmissionsWithReviews(taskIds, notificationMap);
-
-    // Batch-fetch task-level reviews (ratings)
     const taskReviews = await this.batchTaskReviews(taskIds);
-
-    const appTimestamps = await this.batchLatestApplicationTimestamps(taskIds);
-
-    const taskReviewActivityTs: Record<string, number> = {};
-    for (const [taskId, review] of Object.entries(taskReviews)) {
-      taskReviewActivityTs[taskId] = Math.max(
-        review._submittedAtTs ?? 0,
-        review._updatedAtTs ?? 0,
-      );
-    }
 
     const appliedStatuses = currentUser.role === UserRole.DESIGNER
       ? await this.batchApplicationDetails(taskIds, currentUser.id)
       : {};
 
-    // Sort: if search is active, rank by similarity score (highest first);
-    // otherwise sort by latest activity (newest first)
-    if (search) {
-      data.sort((a, b) => {
-        const aScore = similarityScores[a.id] ?? 0;
-        const bScore = similarityScores[b.id] ?? 0;
-        // Primary: similarity score descending
-        if (aScore !== bScore) return bScore - aScore;
-        // Tiebreaker: latest activity descending
-        const aTs = Math.max(
-          a.created_at.getTime(),
-          a.updated_at?.getTime() ?? 0,
-          a.assigned_at?.getTime() ?? 0,
-          submissionsByTask[a.id]?.latestActivityTs ?? 0,
-          appTimestamps[a.id] ?? 0,
-          taskReviewActivityTs[a.id] ?? 0,
-        );
-        const bTs = Math.max(
-          b.created_at.getTime(),
-          b.updated_at?.getTime() ?? 0,
-          b.assigned_at?.getTime() ?? 0,
-          submissionsByTask[b.id]?.latestActivityTs ?? 0,
-          appTimestamps[b.id] ?? 0,
-          taskReviewActivityTs[b.id] ?? 0,
-        );
-        return bTs - aTs;
-      });
-    } else {
-      data.sort((a, b) => {
-        const aTs = Math.max(
-          a.created_at.getTime(),
-          a.updated_at?.getTime() ?? 0,
-          a.assigned_at?.getTime() ?? 0,
-          submissionsByTask[a.id]?.latestActivityTs ?? 0,
-          appTimestamps[a.id] ?? 0,
-          taskReviewActivityTs[a.id] ?? 0,
-        );
-        const bTs = Math.max(
-          b.created_at.getTime(),
-          b.updated_at?.getTime() ?? 0,
-          b.assigned_at?.getTime() ?? 0,
-          submissionsByTask[b.id]?.latestActivityTs ?? 0,
-          appTimestamps[b.id] ?? 0,
-          taskReviewActivityTs[b.id] ?? 0,
-        );
-        return bTs - aTs;
-      });
-    }
-
-    // Apply pagination AFTER sorting by latest activity
-    const skip = (page - 1) * limit;
-    const paged = data.slice(skip, skip + limit);
-
+    // Phase 5: Build response
     return {
       success: true,
-      data: paged.map((task) => {
+      data: data.map((task) => {
         const swr = submissionsByTask[task.id] || {
           taskNotification: { hasNotification: false, notificationId: null },
           caseStudy: [],
@@ -397,6 +329,137 @@ export class DesignerService {
       }),
       meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
     };
+  }
+
+  private buildPaginatedIdQuery(args: {
+    status?: string;
+    assignedTo?: string | null;
+    isPublic?: boolean;
+    isPaused?: boolean;
+    search?: string;
+    currentUser: { id: string; role: UserRole };
+    skip: number;
+    limit: number;
+  }): { sql: string; params: any[] } {
+    const { status, assignedTo, isPublic, isPaused, search, currentUser, skip, limit } = args;
+    const conditions: string[] = [];
+    const params: any[] = [];
+    let pIdx = 0;
+    const p = (val: any) => { pIdx++; params.push(val); return `$${pIdx}`; };
+
+    if (currentUser.role === UserRole.DESIGNER) {
+      conditions.push(
+        `(t.assigned_to_user_id = ${p(currentUser.id)} OR (t.is_public = true AND t.assigned_to_user_id IS NULL))`,
+      );
+    } else if (currentUser.role !== UserRole.CEO && currentUser.role !== UserRole.GENERAL_MANAGER) {
+      throw new AppError(403, DESIGNER_TASK_LIST_FORBIDDEN_MESSAGE);
+    }
+
+    if (status) conditions.push(`t.status = ${p(status)}`);
+    if (assignedTo === null) {
+      conditions.push(`t.assigned_to_user_id IS NULL`);
+    } else if (assignedTo) {
+      conditions.push(`t.assigned_to_user_id = ${p(assignedTo)}`);
+    }
+    if (isPublic !== undefined) conditions.push(`t.is_public = ${p(isPublic)}`);
+    if (isPaused !== undefined) conditions.push(`t.is_paused = ${p(isPaused)}`);
+
+    let selectExprs = "t.id";
+    let orderBy: string;
+    if (search) {
+      const searchPatternParam = p(`%${search}%`);
+      const searchTermParam = p(search);
+      conditions.push(
+        `(t.title ILIKE ${searchPatternParam} OR t.description ILIKE ${searchPatternParam} ` +
+        `OR word_similarity(${searchTermParam}::text, t.title) > 0.2 ` +
+        `OR word_similarity(${searchTermParam}::text, t.description) > 0.2)`,
+      );
+      selectExprs = `t.id, GREATEST(word_similarity(${searchTermParam}::text, t.title), word_similarity(${searchTermParam}::text, t.description)) AS search_relevance`;
+      orderBy = `ORDER BY search_relevance DESC, last_activity_at DESC`;
+    } else {
+      orderBy = `ORDER BY last_activity_at DESC`;
+    }
+
+    const where = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+
+    const sql = `
+      SELECT ${selectExprs}, GREATEST(
+        t.created_at,
+        COALESCE(t.updated_at, t.created_at),
+        COALESCE(sub.max_ts, t.created_at),
+        COALESCE(subrev.max_ts, t.created_at),
+        COALESCE(rev.max_ts, t.created_at)
+      ) AS last_activity_at
+      FROM designer_task t
+      LEFT JOIN LATERAL (
+        SELECT MAX(GREATEST(s.created_at, COALESCE(s.updated_at, s.created_at))) AS max_ts
+        FROM designer_submission s
+        WHERE s.designer_task_id = t.id
+      ) sub ON true
+      LEFT JOIN LATERAL (
+        SELECT MAX(GREATEST(sr.created_at, COALESCE(sr.updated_at, sr.created_at))) AS max_ts
+        FROM designer_submission s
+        INNER JOIN designer_submission_review sr ON sr.designer_submission_id = s.id
+        WHERE s.designer_task_id = t.id
+      ) subrev ON true
+      LEFT JOIN LATERAL (
+        SELECT MAX(GREATEST(r.created_at, COALESCE(r.updated_at, r.created_at))) AS max_ts
+        FROM designer_task_review r
+        WHERE r.designer_task_id = t.id
+      ) rev ON true
+      ${where}
+      ${orderBy}
+      LIMIT ${p(limit)} OFFSET ${p(skip)}
+    `;
+
+    return { sql, params };
+  }
+
+  private buildCountQuery(args: {
+    status?: string;
+    assignedTo?: string | null;
+    isPublic?: boolean;
+    isPaused?: boolean;
+    search?: string;
+    currentUser: { id: string; role: UserRole };
+  }): { sql: string; params: any[] } {
+    const { status, assignedTo, isPublic, isPaused, search, currentUser } = args;
+    const conditions: string[] = [];
+    const params: any[] = [];
+    let pIdx = 0;
+    const p = (val: any) => { pIdx++; params.push(val); return `$${pIdx}`; };
+
+    if (currentUser.role === UserRole.DESIGNER) {
+      conditions.push(
+        `(t.assigned_to_user_id = ${p(currentUser.id)} OR (t.is_public = true AND t.assigned_to_user_id IS NULL))`,
+      );
+    } else if (currentUser.role !== UserRole.CEO && currentUser.role !== UserRole.GENERAL_MANAGER) {
+      throw new AppError(403, DESIGNER_TASK_LIST_FORBIDDEN_MESSAGE);
+    }
+
+    if (status) conditions.push(`t.status = ${p(status)}`);
+    if (assignedTo === null) {
+      conditions.push(`t.assigned_to_user_id IS NULL`);
+    } else if (assignedTo) {
+      conditions.push(`t.assigned_to_user_id = ${p(assignedTo)}`);
+    }
+    if (isPublic !== undefined) conditions.push(`t.is_public = ${p(isPublic)}`);
+    if (isPaused !== undefined) conditions.push(`t.is_paused = ${p(isPaused)}`);
+
+    if (search) {
+      const sp = p(`%${search}%`);
+      const st = p(search);
+      conditions.push(
+        `(t.title ILIKE ${sp} OR t.description ILIKE ${sp} ` +
+        `OR word_similarity(${st}::text, t.title) > 0.2 ` +
+        `OR word_similarity(${st}::text, t.description) > 0.2)`,
+      );
+    }
+
+    const where = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+    const sql = `SELECT COUNT(*) AS count FROM designer_task t ${where}`;
+
+    return { sql, params };
   }
 
   private async batchSubmissionsWithReviews(
@@ -554,28 +617,6 @@ export class DesignerService {
         _submittedAtTs: review.created_at?.getTime() ?? 0,
         _updatedAtTs: review.updated_at?.getTime() ?? 0,
       };
-    }
-    return result;
-  }
-
-  private async batchLatestApplicationTimestamps(taskIds: string[]): Promise<Record<string, number>> {
-    if (taskIds.length === 0) return {};
-
-    const apps = await this.applicationRepo
-      .createQueryBuilder("a")
-      .select("a.designer_task_id", "task_id")
-      .addSelect("GREATEST(a.created_at, COALESCE(a.updated_at, a.created_at))", "latest_ts")
-      .where("a.designer_task_id IN (:...taskIds)", { taskIds })
-      .andWhere("a.is_withdrawn = false")
-      .getRawMany<{ task_id: string; latest_ts: Date }>();
-
-    const result: Record<string, number> = {};
-    for (const row of apps) {
-      const ts = new Date(row.latest_ts).getTime();
-      const cur = result[row.task_id];
-      if (cur === undefined || ts > cur) {
-        result[row.task_id] = ts;
-      }
     }
     return result;
   }
