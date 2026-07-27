@@ -26,7 +26,7 @@ export class User {
   @Column({ type: "boolean", default: true })
   is_active: boolean;
 
-  @Column({ type: "varchar", length: 255 })
+  @Column({ type: "varchar", length: 255, select: false })
   password_hash: string;
 
   @Column({ type: "timestamptz", nullable: true })

@@ -45,7 +45,11 @@ export class AuthService {
     accessToken: string;
     user: SafeUserOutput;
   }> {
-    const user = await userRepo().findOne({ where: { email } });
+    const user = await userRepo()
+      .createQueryBuilder("user")
+      .addSelect("user.password_hash")
+      .where("user.email = :email", { email })
+      .getOne();
     if (!user) {
       throw new AppError(401, "Invalid email or password");
     }
