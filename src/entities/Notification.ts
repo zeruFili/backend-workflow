@@ -1,5 +1,5 @@
 import {
-  Entity, PrimaryGeneratedColumn, Column, CreateDateColumn,
+  Entity, PrimaryColumn, Column, CreateDateColumn,
   ManyToOne, JoinColumn, Index,
 } from "typeorm";
 import { User } from "./User";
@@ -10,7 +10,7 @@ import { ParentType } from "../enums/parent-type.enum";
 @Index("idx_notif_user_parent", ["user_id", "parent_id", "viewed"])
 @Index("idx_notif_user_parent_type", ["user_id", "viewed", "parent_type", "resource_type"])
 export class Notification {
-  @PrimaryGeneratedColumn("uuid")
+  @PrimaryColumn({ type: "uuid", default: () => "gen_random_uuid()" })
   id: string;
 
   @Column({ type: "uuid" })

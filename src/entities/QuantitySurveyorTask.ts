@@ -1,5 +1,5 @@
 import {
-  Entity, PrimaryGeneratedColumn, Column, CreateDateColumn,
+  Entity, PrimaryColumn, Column, CreateDateColumn,
   ManyToOne, JoinColumn, Index,
 } from "typeorm";
 import { User } from "./User";
@@ -9,7 +9,7 @@ import { TaskState } from "../enums/task-state.enum";
 @Entity("quantity_surveyor_task")
 @Index("idx_quantity_surveyor_task_assigned_to", ["assigned_to_user_id"])
 export class QuantitySurveyorTask {
-  @PrimaryGeneratedColumn("uuid")
+  @PrimaryColumn({ type: "uuid", default: () => "gen_random_uuid()" })
   id: string;
 
   @Column({ type: "uuid", nullable: true })

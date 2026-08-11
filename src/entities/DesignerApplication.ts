@@ -1,5 +1,5 @@
 import {
-  Entity, PrimaryGeneratedColumn, Column, CreateDateColumn,
+  Entity, PrimaryColumn, Column, CreateDateColumn,
   ManyToOne, JoinColumn, Index,
 } from "typeorm";
 import { DesignerTask } from "./DesignerTask";
@@ -8,7 +8,7 @@ import { User } from "./User";
 @Entity("designer_application")
 @Index("idx_designer_application_task_applicant", ["designer_task_id", "applicant_user_id"])
 export class DesignerApplication {
-  @PrimaryGeneratedColumn("uuid")
+  @PrimaryColumn({ type: "uuid", default: () => "gen_random_uuid()" })
   id: string;
 
   @Column({ type: "uuid" })

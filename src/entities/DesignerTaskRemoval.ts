@@ -1,5 +1,5 @@
 import {
-  Entity, PrimaryGeneratedColumn, Column, CreateDateColumn,
+  Entity, PrimaryColumn, Column, CreateDateColumn,
   ManyToOne, JoinColumn,
 } from "typeorm";
 import { DesignerTask } from "./DesignerTask";
@@ -7,7 +7,7 @@ import { User } from "./User";
 
 @Entity("designer_task_removal")
 export class DesignerTaskRemoval {
-  @PrimaryGeneratedColumn("uuid")
+  @PrimaryColumn({ type: "uuid", default: () => "gen_random_uuid()" })
   id: string;
 
   @Column({ type: "uuid" })

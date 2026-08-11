@@ -1,12 +1,12 @@
 import {
-  Entity, PrimaryGeneratedColumn, Column, CreateDateColumn,
+  Entity, PrimaryColumn, Column, CreateDateColumn,
   OneToMany, Index,
 } from "typeorm";
 import { UserRole } from "../enums/user-role.enum";
 
 @Entity("user")
 export class User {
-  @PrimaryGeneratedColumn("uuid")
+  @PrimaryColumn({ type: "uuid", default: () => "gen_random_uuid()" })
   id: string;
 
   @Column({ type: "varchar", length: 255 })

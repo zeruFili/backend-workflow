@@ -1,5 +1,5 @@
 import {
-  Entity, PrimaryGeneratedColumn, Column, CreateDateColumn,
+  Entity, PrimaryColumn, Column, CreateDateColumn,
   ManyToOne, JoinColumn, Index,
 } from "typeorm";
 import { DataCollectorTask } from "./DataCollectorTask";
@@ -7,7 +7,7 @@ import { DataCollectorTask } from "./DataCollectorTask";
 @Entity("data_collector_submission")
 @Index("idx_data_collector_submission_task_id", ["data_collector_task_id"])
 export class DataCollectorSubmission {
-  @PrimaryGeneratedColumn("uuid")
+  @PrimaryColumn({ type: "uuid", default: () => "gen_random_uuid()" })
   id: string;
 
   @Column({ type: "uuid" })

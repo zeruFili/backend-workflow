@@ -1,5 +1,5 @@
 import {
-  Entity, PrimaryGeneratedColumn, Column, CreateDateColumn,
+  Entity, PrimaryColumn, Column, CreateDateColumn,
   ManyToOne, JoinColumn, Index,
 } from "typeorm";
 import { QuantitySurveyorTask } from "./QuantitySurveyorTask";
@@ -8,7 +8,7 @@ import { SubmissionReviewStatus } from "../enums";
 @Entity("quantity_surveyor_submission")
 @Index("idx_qs_submission_task_id", ["quantity_surveyor_task_id"])
 export class QuantitySurveyorSubmission {
-  @PrimaryGeneratedColumn("uuid")
+  @PrimaryColumn({ type: "uuid", default: () => "gen_random_uuid()" })
   id: string;
 
   @Column({ type: "uuid" })

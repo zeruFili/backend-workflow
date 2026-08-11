@@ -68,7 +68,9 @@ async function cleanupOldMarketingTables() {
   } catch (e: any) {
     console.log("Marketing cleanup (non-fatal):", e.message);
   } finally {
-    await cleanupDs.destroy();
+    if (cleanupDs.isInitialized) {
+      await cleanupDs.destroy();
+    }
   }
 }
 

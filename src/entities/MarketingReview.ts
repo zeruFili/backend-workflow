@@ -1,5 +1,5 @@
 import {
-  Entity, PrimaryGeneratedColumn, Column, CreateDateColumn,
+  Entity, PrimaryColumn, Column, CreateDateColumn,
   ManyToOne, JoinColumn, Index,
 } from "typeorm";
 import { MarketingSubmission } from "./MarketingSubmission";
@@ -10,7 +10,7 @@ import { ReviewOutcome } from "../enums/review-outcome.enum";
 @Index("idx_marketing_review_submission_id", ["marketing_submission_id"])
 @Index("idx_marketing_review_reviewer_user_id", ["reviewer_user_id"])
 export class MarketingReview {
-  @PrimaryGeneratedColumn("uuid")
+  @PrimaryColumn({ type: "uuid", default: () => "gen_random_uuid()" })
   id: string;
 
   @Column({ type: "uuid" })

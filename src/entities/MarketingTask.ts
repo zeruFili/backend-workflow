@@ -1,5 +1,5 @@
 import {
-  Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn,
+  Entity, PrimaryColumn, Column, CreateDateColumn, UpdateDateColumn,
   ManyToOne, JoinColumn, Index,
 } from "typeorm";
 import { User } from "./User";
@@ -9,7 +9,7 @@ import { TaskState } from "../enums/task-state.enum";
 @Entity("marketing_task")
 @Index("idx_marketing_task_user_status", ["marketing_user_id", "status"])
 export class MarketingTask {
-  @PrimaryGeneratedColumn("uuid")
+  @PrimaryColumn({ type: "uuid", default: () => "gen_random_uuid()" })
   id: string;
 
   @Column({ type: "uuid" })

@@ -1,5 +1,5 @@
 import {
-  Entity, PrimaryGeneratedColumn, Column, CreateDateColumn,
+  Entity, PrimaryColumn, Column, CreateDateColumn,
   ManyToOne, JoinColumn, Index,
 } from "typeorm";
 import { User } from "./User";
@@ -10,7 +10,7 @@ import { TaskState } from "../enums/task-state.enum";
 @Entity("designer_task")
 @Index("idx_designer_task_assigned_to_user_id", ["assigned_to_user_id"])
 export class DesignerTask {
-  @PrimaryGeneratedColumn("uuid")
+  @PrimaryColumn({ type: "uuid", default: () => "gen_random_uuid()" })
   id: string;
 
   @Column({ type: "uuid", nullable: true })

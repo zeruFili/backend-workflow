@@ -1,5 +1,5 @@
 import {
-  Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn,
+  Entity, PrimaryColumn, Column, CreateDateColumn, UpdateDateColumn,
   ManyToOne, JoinColumn, Index,
 } from "typeorm";
 import { User } from "./User";
@@ -9,7 +9,7 @@ import { TaskState } from "../enums/task-state.enum";
 @Entity("data_collector_task")
 @Index("idx_data_collector_task_assigned_status", ["assigned_to_user_id", "status"])
 export class DataCollectorTask {
-  @PrimaryGeneratedColumn("uuid")
+  @PrimaryColumn({ type: "uuid", default: () => "gen_random_uuid()" })
   id: string;
 
   @Column({ type: "uuid", nullable: true })

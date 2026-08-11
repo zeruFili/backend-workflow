@@ -1,5 +1,5 @@
 import {
-  Entity, PrimaryGeneratedColumn, Column, CreateDateColumn,
+  Entity, PrimaryColumn, Column, CreateDateColumn,
   ManyToOne, JoinColumn, Index,
 } from "typeorm";
 import { MarketingTask } from "./MarketingTask";
@@ -7,7 +7,7 @@ import { MarketingTask } from "./MarketingTask";
 @Entity("marketing_submission")
 @Index("idx_marketing_submission_task_id", ["marketing_task_id"])
 export class MarketingSubmission {
-  @PrimaryGeneratedColumn("uuid")
+  @PrimaryColumn({ type: "uuid", default: () => "gen_random_uuid()" })
   id: string;
 
   @Column({ type: "uuid" })

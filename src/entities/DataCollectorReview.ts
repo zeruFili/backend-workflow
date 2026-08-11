@@ -1,5 +1,5 @@
 import {
-  Entity, PrimaryGeneratedColumn, Column, CreateDateColumn,
+  Entity, PrimaryColumn, Column, CreateDateColumn,
   ManyToOne, JoinColumn, Index,
 } from "typeorm";
 import { DataCollectorSubmission } from "./DataCollectorSubmission";
@@ -10,7 +10,7 @@ import { ReviewOutcome } from "../enums/review-outcome.enum";
 @Index("idx_data_collector_review_submission_id", ["data_collector_submission_id"])
 @Index("idx_data_collector_review_reviewer_user_id", ["reviewer_user_id"])
 export class DataCollectorReview {
-  @PrimaryGeneratedColumn("uuid")
+  @PrimaryColumn({ type: "uuid", default: () => "gen_random_uuid()" })
   id: string;
 
   @Column({ type: "uuid" })

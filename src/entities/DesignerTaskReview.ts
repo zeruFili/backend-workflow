@@ -1,5 +1,5 @@
 import {
-  Entity, PrimaryGeneratedColumn, Column, CreateDateColumn,
+  Entity, PrimaryColumn, Column, CreateDateColumn,
   ManyToOne, JoinColumn, Index, Check,
 } from "typeorm";
 import { DesignerTask } from "./DesignerTask";
@@ -12,7 +12,7 @@ import { User } from "./User";
 @Check("chk_rendering_quality", "rendering_quality >= 1 AND rendering_quality <= 5")
 @Check("chk_client_understanding", "client_understanding >= 1 AND client_understanding <= 5")
 export class DesignerTaskReview {
-  @PrimaryGeneratedColumn("uuid")
+  @PrimaryColumn({ type: "uuid", default: () => "gen_random_uuid()" })
   id: string;
 
   @Column({ type: "uuid" })
