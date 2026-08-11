@@ -194,10 +194,7 @@ export class DesignerService {
     }
 
     if (currentUser.role === UserRole.DESIGNER) {
-      qb.andWhere(
-        "(t.assigned_to_user_id = :currentUserId OR (t.is_public = true AND t.assigned_to_user_id IS NULL))",
-        { currentUserId: currentUser.id }
-      );
+      qb.andWhere("t.assigned_to_user_id = :currentUserId", { currentUserId: currentUser.id });
       return;
     }
 
@@ -354,10 +351,12 @@ export class DesignerService {
     let pIdx = 0;
     const p = (val: any) => { pIdx++; params.push(val); return `$${pIdx}`; };
 
+    const hasExplicitFilter = assignedTo !== undefined || isPublic !== undefined;
+
     if (currentUser.role === UserRole.DESIGNER) {
-      conditions.push(
-        `(t.assigned_to_user_id = ${p(currentUser.id)} OR (t.is_public = true AND t.assigned_to_user_id IS NULL))`,
-      );
+      if (!hasExplicitFilter) {
+        conditions.push(`t.assigned_to_user_id = ${p(currentUser.id)}`);
+      }
     } else if (currentUser.role !== UserRole.CEO && currentUser.role !== UserRole.GENERAL_MANAGER) {
       throw new AppError(403, DESIGNER_TASK_LIST_FORBIDDEN_MESSAGE);
     }
@@ -436,10 +435,12 @@ export class DesignerService {
     let pIdx = 0;
     const p = (val: any) => { pIdx++; params.push(val); return `$${pIdx}`; };
 
+    const hasExplicitFilter = assignedTo !== undefined || isPublic !== undefined;
+
     if (currentUser.role === UserRole.DESIGNER) {
-      conditions.push(
-        `(t.assigned_to_user_id = ${p(currentUser.id)} OR (t.is_public = true AND t.assigned_to_user_id IS NULL))`,
-      );
+      if (!hasExplicitFilter) {
+        conditions.push(`t.assigned_to_user_id = ${p(currentUser.id)}`);
+      }
     } else if (currentUser.role !== UserRole.CEO && currentUser.role !== UserRole.GENERAL_MANAGER) {
       throw new AppError(403, DESIGNER_TASK_LIST_FORBIDDEN_MESSAGE);
     }
