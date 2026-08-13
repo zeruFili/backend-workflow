@@ -1914,7 +1914,12 @@ export class DesignerService {
         id: row.id,
         title: row.title,
         storyPoint: parseInt(row.story_point ?? '0', 10),
-        rating: parseFloat(((c + t + r + cu) / 4).toFixed(1)),
+        ratings: {
+          creativity: c,
+          timeliness: t,
+          renderingQuality: r,
+          clientUnderstanding: cu,
+        },
         reviewedAt: row.reviewed_at ?? null,
       };
     });
