@@ -271,10 +271,16 @@ export class DesignerService {
       : [];
 
     const notificationMap = new Map<string, string>();
+    const postedJobNotificationMap = new Map<string, string>();
     const rateNotifByReviewId = new Map<string, { notificationId: string }>();
 
     for (const n of unreadNotifications) {
-      if (n.resource_type === ResourceType.POSTED_JOB) continue;
+      if (n.resource_type === ResourceType.POSTED_JOB) {
+        if (!postedJobNotificationMap.has(n.resource_id)) {
+          postedJobNotificationMap.set(n.resource_id, n.id);
+        }
+        continue;
+      }
       if (n.resource_type === ResourceType.RATE) {
         rateNotifByReviewId.set(n.resource_id, { notificationId: n.id });
       } else {
@@ -303,6 +309,9 @@ export class DesignerService {
           finalStage: [],
         };
         const { taskNotification, ...restSwr } = swr;
+        const postedJobTaskNotification = postedJobNotificationMap.has(task.id)
+          ? { hasNotification: true, notificationId: postedJobNotificationMap.get(task.id) }
+          : null;
         const hasNestedNotification =
           swr.caseStudy?.some((s: any) => s.hasNotification || (s.reviews || []).some((r: any) => r.hasNotification)) ||
           swr.designing?.some((s: any) => s.hasNotification || (s.reviews || []).some((r: any) => r.hasNotification)) ||
@@ -310,7 +319,7 @@ export class DesignerService {
           swr.finalStage?.some((s: any) => s.hasNotification || (s.reviews || []).some((r: any) => r.hasNotification));
         return {
           ...this.sanitizeDesignerTask(task),
-          taskNotification,
+          taskNotification: postedJobTaskNotification ?? taskNotification,
           submissionsWithReviews: restSwr,
           hasNestedNotification,
           taskReview: taskReviews[task.id]
@@ -1597,11 +1606,6 @@ export class DesignerService {
       throw new AppError(403, "You are not authorized to update this rating.");
     }
 
-    const daysSinceCreation = (Date.now() - review.created_at.getTime()) / (1000 * 60 * 60 * 24);
-    if (daysSinceCreation > 7) {
-      throw new AppError(400, "This rating can no longer be updated. Ratings may only be modified within 7 days of creation.");
-    }
-
     if (params.creativity !== undefined) review.creativity = params.creativity;
     if (params.timeliness !== undefined) review.timeliness = params.timeliness;
     if (params.renderingQuality !== undefined) review.rendering_quality = params.renderingQuality;
@@ -2269,9 +2273,15 @@ export class DesignerService {
     });
 
     const notificationMap = new Map<string, string>();
+    const postedJobNotificationMap = new Map<string, string>();
     const rateNotifByReviewId = new Map<string, { notificationId: string }>();
     for (const n of unreadNotifications) {
-      if (n.resource_type === ResourceType.POSTED_JOB) continue;
+      if (n.resource_type === ResourceType.POSTED_JOB) {
+        if (!postedJobNotificationMap.has(n.resource_id)) {
+          postedJobNotificationMap.set(n.resource_id, n.id);
+        }
+        continue;
+      }
       if (n.resource_type === ResourceType.RATE) {
         rateNotifByReviewId.set(n.resource_id, { notificationId: n.id });
       } else {
@@ -2286,6 +2296,9 @@ export class DesignerService {
 
     const swr = submissionsByTask[updated.id] || { taskNotification: { hasNotification: false, notificationId: null }, caseStudy: [], designing: [], rendering: [], finalStage: [] };
     const { taskNotification, ...restSwr } = swr;
+    const postedJobTaskNotification = postedJobNotificationMap.has(updated.id)
+      ? { hasNotification: true, notificationId: postedJobNotificationMap.get(updated.id) }
+      : null;
     const hasNestedNotification =
       swr.caseStudy?.some((s: any) => s.hasNotification || (s.reviews || []).some((r: any) => r.hasNotification)) ||
       swr.designing?.some((s: any) => s.hasNotification || (s.reviews || []).some((r: any) => r.hasNotification)) ||
@@ -2294,7 +2307,7 @@ export class DesignerService {
 
     return {
       ...this.sanitizeDesignerTask(updated),
-      taskNotification,
+      taskNotification: postedJobTaskNotification ?? taskNotification,
       submissionsWithReviews: restSwr,
       hasNestedNotification,
       taskReview: taskReviews[updated.id]
@@ -2339,9 +2352,15 @@ export class DesignerService {
     });
 
     const notificationMap = new Map<string, string>();
+    const postedJobNotificationMap = new Map<string, string>();
     const rateNotifByReviewId = new Map<string, { notificationId: string }>();
     for (const n of unreadNotifications) {
-      if (n.resource_type === ResourceType.POSTED_JOB) continue;
+      if (n.resource_type === ResourceType.POSTED_JOB) {
+        if (!postedJobNotificationMap.has(n.resource_id)) {
+          postedJobNotificationMap.set(n.resource_id, n.id);
+        }
+        continue;
+      }
       if (n.resource_type === ResourceType.RATE) {
         rateNotifByReviewId.set(n.resource_id, { notificationId: n.id });
       } else {
@@ -2356,6 +2375,9 @@ export class DesignerService {
 
     const swr = submissionsByTask[updated.id] || { taskNotification: { hasNotification: false, notificationId: null }, caseStudy: [], designing: [], rendering: [], finalStage: [] };
     const { taskNotification, ...restSwr } = swr;
+    const postedJobTaskNotification = postedJobNotificationMap.has(updated.id)
+      ? { hasNotification: true, notificationId: postedJobNotificationMap.get(updated.id) }
+      : null;
     const hasNestedNotification =
       swr.caseStudy?.some((s: any) => s.hasNotification || (s.reviews || []).some((r: any) => r.hasNotification)) ||
       swr.designing?.some((s: any) => s.hasNotification || (s.reviews || []).some((r: any) => r.hasNotification)) ||
@@ -2364,7 +2386,7 @@ export class DesignerService {
 
     return {
       ...this.sanitizeDesignerTask(updated),
-      taskNotification,
+      taskNotification: postedJobTaskNotification ?? taskNotification,
       submissionsWithReviews: restSwr,
       hasNestedNotification,
       taskReview: taskReviews[updated.id]
