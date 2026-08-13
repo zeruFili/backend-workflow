@@ -1721,7 +1721,7 @@ export class DesignerService {
       ? currentUser.id
       : (userId || allDesigners[0]?.id || '');
     if (!targetUserId) {
-      return { designers: allDesigners, selected: null, periodLabel: '', periodRange: null, kpis: null, ratingBreakdown: null, storyPointBreakdown: null, previousPeriodLabel: '', previousKpis: null, previousRatingBreakdown: null, previousStoryPointBreakdown: null, trend: [] };
+      return { designers: allDesigners, selected: null, periodLabel: '', periodRange: null, kpis: null, ratingBreakdown: null, storyPointBreakdown: null, previousPeriodLabel: '', previousKpis: null, previousRatingBreakdown: null, previousStoryPointBreakdown: null, trend: [], assignedTasks: [], ratedTasks: [] };
     }
 
     if (mode === 'yearly') {
@@ -1745,6 +1745,8 @@ export class DesignerService {
           }));
         })
       );
+
+      const { assignedTasks, ratedTasks } = await this.queryAssignedAndRatedTasks(targetUserId, start, end);
 
       return {
         designers: allDesigners,
@@ -1783,6 +1785,8 @@ export class DesignerService {
             }
           : null,
         trend,
+        assignedTasks,
+        ratedTasks,
       };
     }
 
@@ -1805,6 +1809,8 @@ export class DesignerService {
         }));
       })
     );
+
+    const { assignedTasks, ratedTasks } = await this.queryAssignedAndRatedTasks(targetUserId, start, end);
 
     return {
       designers: allDesigners,
@@ -1843,7 +1849,77 @@ export class DesignerService {
           }
         : null,
       trend,
+      assignedTasks,
+      ratedTasks,
     };
+  }
+
+  private async queryAssignedAndRatedTasks(
+    designerId: string,
+    periodStart: Date,
+    periodEnd: Date,
+  ): Promise<{ assignedTasks: any[]; ratedTasks: any[] }> {
+    const startIso = periodStart.toISOString();
+    const endIso = periodEnd.toISOString();
+
+    const assignedTasksRaw = await this.taskRepo
+      .createQueryBuilder('dt')
+      .select([
+        'dt.id AS id',
+        'dt.title AS title',
+        'dt.status AS status',
+        'dt.story_point AS story_point',
+        'dt.assigned_at AS assigned_at',
+      ])
+      .where('dt.assigned_to_user_id = :designerId', { designerId })
+      .andWhere('dt.task_state = :taskState', { taskState: TaskState.ACTIVE })
+      .andWhere('dt.assigned_at >= :start', { start: startIso })
+      .andWhere('dt.assigned_at < :end', { end: endIso })
+      .orderBy('dt.assigned_at', 'DESC')
+      .getRawMany();
+
+    const ratedTasksRaw = await this.taskReviewRepo
+      .createQueryBuilder('dtr')
+      .leftJoin('designer_task', 'dt', 'dt.id = dtr.designer_task_id')
+      .select([
+        'dt.id AS id',
+        'dt.title AS title',
+        'dt.story_point AS story_point',
+        'dtr.creativity AS creativity',
+        'dtr.timeliness AS timeliness',
+        'dtr.rendering_quality AS rendering_quality',
+        'dtr.client_understanding AS client_understanding',
+        'dtr.created_at AS reviewed_at',
+      ])
+      .where('dt.assigned_to_user_id = :designerId', { designerId })
+      .andWhere('dtr.created_at >= :start', { start: startIso })
+      .andWhere('dtr.created_at < :end', { end: endIso })
+      .orderBy('dtr.created_at', 'DESC')
+      .getRawMany();
+
+    const assignedTasks = assignedTasksRaw.map((row) => ({
+      id: row.id,
+      title: row.title,
+      status: row.status ?? null,
+      storyPoint: parseInt(row.story_point ?? '0', 10),
+      assignedAt: row.assigned_at ?? null,
+    }));
+
+    const ratedTasks = ratedTasksRaw.map((row) => {
+      const c = parseFloat(row.creativity) || 0;
+      const t = parseFloat(row.timeliness) || 0;
+      const r = parseFloat(row.rendering_quality) || 0;
+      const cu = parseFloat(row.client_understanding) || 0;
+      return {
+        id: row.id,
+        title: row.title,
+        storyPoint: parseInt(row.story_point ?? '0', 10),
+        rating: parseFloat(((c + t + r + cu) / 4).toFixed(1)),
+        reviewedAt: row.reviewed_at ?? null,
+      };
+    });
+
+    return { assignedTasks, ratedTasks };
   }
 
   private periodToRange(
