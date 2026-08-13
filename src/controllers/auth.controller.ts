@@ -5,6 +5,7 @@ import { AuthRequest } from "../middlewares/auth.middleware";
 import { AppError } from "../middlewares/error.middleware";
 import { authService } from "../services/auth.service";
 import { LoginDto, ForgotPasswordDto, ResetPasswordDto } from "../validators/auth.dto";
+import { recordLoginFailure } from "../middlewares/login-rate-limit.middleware";
 
 export class AuthController {
   async login(req: Request, res: Response): Promise<void> {
@@ -21,6 +22,9 @@ export class AuthController {
       res.status(200).json({ success: true, message: "Login successful", data: result });
     } catch (err) {
       if (err instanceof AppError) {
+        if (err.statusCode === 401) {
+          recordLoginFailure(req);
+        }
         res.status(err.statusCode).json({ success: false, message: err.message });
         return;
       }
