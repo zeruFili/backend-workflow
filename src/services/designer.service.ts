@@ -770,26 +770,8 @@ export class DesignerService {
   }
 
   async updateTask(id: string, params: UpdateTaskParams, currentUser: UpdateTaskActor) {
-    console.log('[DesignerService.updateTask] ========== UPDATE TASK SERVICE ==========');
-    console.log('[DesignerService.updateTask] Task ID:', id);
-    console.log('[DesignerService.updateTask] Params:', JSON.stringify(params, null, 2));
-    console.log('[DesignerService.updateTask] Current user:', { id: currentUser.id, role: currentUser.role });
-
     const task = await this.taskRepo.findOneBy({ id });
     if (!task) throw new AppError(404, "Designer task not found");
-
-    console.log('[DesignerService.updateTask] TASK BEFORE UPDATE:');
-    console.log('[DesignerService.updateTask]   - title:', task.title);
-    console.log('[DesignerService.updateTask]   - description:', task.description ? task.description.substring(0, 100) + '...' : 'null');
-    console.log('[DesignerService.updateTask]   - story_point:', task.story_point);
-    console.log('[DesignerService.updateTask]   - is_public:', task.is_public);
-    console.log('[DesignerService.updateTask]   - due_date:', task.due_date);
-    console.log('[DesignerService.updateTask]   - assigned_to_user_id:', task.assigned_to_user_id);
-    console.log('[DesignerService.updateTask]   - assigned_at:', task.assigned_at);
-    console.log('[DesignerService.updateTask]   - stage:', task.stage);
-    console.log('[DesignerService.updateTask]   - status:', task.status);
-    console.log('[DesignerService.updateTask]   - is_paused:', task.is_paused);
-    console.log('[DesignerService.updateTask]   - attachment_urls:', task.attachment_urls);
 
     if (currentUser.role === UserRole.GENERAL_MANAGER) {
       if (task.assigned_by_user_id !== currentUser.id) {
@@ -818,23 +800,19 @@ export class DesignerService {
     const previousAssignee = task.assigned_to_user_id;
     const previousIsPublic = task.is_public;
 
-    console.log('[DesignerService.updateTask] VALUES BEING UPDATED:');
-    if (params.title !== undefined) { task.title = params.title; console.log('[DesignerService.updateTask]   - title:', params.title); }
-    if (params.description !== undefined) { task.description = params.description; console.log('[DesignerService.updateTask]   - description:', params.description?.substring(0, 80) + '...'); }
-    if (params.status !== undefined) { task.status = params.status; console.log('[DesignerService.updateTask]   - status:', params.status); }
-    if (params.stage !== undefined) { task.stage = params.stage; console.log('[DesignerService.updateTask]   - stage:', params.stage); }
-    if (params.is_public !== undefined) { task.is_public = params.is_public; console.log('[DesignerService.updateTask]   - is_public:', params.is_public); }
-    if (params.story_point !== undefined) { task.story_point = params.story_point; console.log('[DesignerService.updateTask]   - story_point:', params.story_point); }
-    if (params.due_date !== undefined) { task.due_date = params.due_date as any; console.log('[DesignerService.updateTask]   - due_date:', params.due_date); }
+    if (params.title !== undefined) { task.title = params.title; }
+    if (params.description !== undefined) { task.description = params.description; }
+    if (params.status !== undefined) { task.status = params.status; }
+    if (params.stage !== undefined) { task.stage = params.stage; }
+    if (params.is_public !== undefined) { task.is_public = params.is_public; }
+    if (params.story_point !== undefined) { task.story_point = params.story_point; }
+    if (params.due_date !== undefined) { task.due_date = params.due_date as any; }
     if (params.assigned_to_user_id !== undefined) {
       task.assigned_to_user_id = params.assigned_to_user_id as any;
       task.assigned_at = params.assigned_to_user_id ? (previousAssignee ? task.assigned_at : new Date()) : null;
-      console.log('[DesignerService.updateTask]   - assigned_to_user_id:', params.assigned_to_user_id, '(was:', previousAssignee, ')');
-      console.log('[DesignerService.updateTask]   - assigned_at set to:', task.assigned_at);
     }
     if (params.attachment_urls !== undefined) {
       task.attachment_urls = syncAttachments(task.attachment_urls, params.attachment_urls) as any;
-      console.log('[DesignerService.updateTask]   - attachment_urls:', task.attachment_urls);
     }
 
     task.updated_by = currentUser.id as any;
@@ -1134,38 +1112,27 @@ export class DesignerService {
   }
 
   async withdrawApplication(taskId: string, applicantUserId: string) {
-    console.log('[DesignerService.withdrawApplication] ========== WITHDRAW APPLICATION ==========');
-    console.log('[DesignerService.withdrawApplication] Task ID:', taskId);
-    console.log('[DesignerService.withdrawApplication] Applicant user ID:', applicantUserId);
-
     const application = await this.applicationRepo.findOne({
       where: { designer_task_id: taskId, applicant_user_id: applicantUserId },
     });
-    console.log('[DesignerService.withdrawApplication] Application found:', application ? `yes (id=${application.id}, is_withdrawn=${application.is_withdrawn})` : 'NO');
     if (!application) {
-      console.log('[DesignerService.withdrawApplication] ERROR: Application not found');
       throw new AppError(404, "Application not found");
     }
     if (application.is_withdrawn) {
-      console.log('[DesignerService.withdrawApplication] ERROR: Application already withdrawn');
       throw new AppError(400, "Application is already withdrawn");
     }
 
     application.is_withdrawn = true;
     application.updated_at = new Date();
-    console.log('[DesignerService.withdrawApplication] Marking as withdrawn, updated_at:', application.updated_at);
     const saved = await this.applicationRepo.save(application);
-    console.log('[DesignerService.withdrawApplication] Saved successfully, is_withdrawn:', saved.is_withdrawn);
 
-    const deleteResult = await this.notificationRepo.delete({
+    await this.notificationRepo.delete({
       resource_type: ResourceType.APPLY,
       parent_id: taskId,
       from_user_id: applicantUserId,
       viewed: false,
     });
-    console.log('[DesignerService.withdrawApplication] Notifications deleted:', deleteResult.affected);
 
-    console.log('[DesignerService.withdrawApplication] ========== WITHDRAW COMPLETE ==========');
     return saved;
   }
 
@@ -2184,17 +2151,8 @@ export class DesignerService {
   }
 
   async removeTask(taskId: string, removedByUserId: string, reason: string) {
-    console.log('[DesignerService.removeTask] ========== DELETE TASK SERVICE ==========');
-    console.log('[DesignerService.removeTask] Task ID:', taskId);
-    console.log('[DesignerService.removeTask] Removed by:', removedByUserId);
-    console.log('[DesignerService.removeTask] Reason:', reason);
-
     const task = await this.taskRepo.findOneBy({ id: taskId });
     if (!task) throw new AppError(404, "Designer task not found");
-
-    console.log('[DesignerService.removeTask] Task found - title:', task.title);
-    console.log('[DesignerService.removeTask] Task found - assigned_to_user_id:', task.assigned_to_user_id);
-    console.log('[DesignerService.removeTask] Task found - task_state:', task.task_state);
 
     const submissions = await this.submissionRepo.find({
       where: { designer_task_id: taskId },
@@ -2223,16 +2181,10 @@ export class DesignerService {
     await this.notificationRepo.delete({ parent_id: taskId });
     await this.notificationRepo.delete({ resource_id: taskId });
 
-    console.log('[DesignerService.removeTask] Deleted notifications for parent_id and resource_id:', taskId);
-    console.log('[DesignerService.removeTask] Setting task_state to DEACTIVE');
-
     task.task_state = TaskState.DEACTIVE;
     task.updated_by = removedByUserId as any;
     task.updated_at = new Date();
     await this.taskRepo.save(task);
-
-    console.log('[DesignerService.removeTask] Task saved with task_state:', task.task_state);
-    console.log('[DesignerService.removeTask] ========== DELETE TASK COMPLETE ==========');
 
     return task;
   }

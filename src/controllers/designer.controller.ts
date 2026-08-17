@@ -174,10 +174,6 @@ export class DesignerController {
       }
 
       const id = req.params.id as string;
-      console.log('[DesignerController.updateTask] ========== UPDATE TASK REQUEST ==========');
-      console.log('[DesignerController.updateTask] Task ID:', id);
-      console.log('[DesignerController.updateTask] Raw req.body:', JSON.stringify(req.body, null, 2));
-      console.log('[DesignerController.updateTask] User:', { id: req.user.id, role: req.user.role });
 
       const bodyForValidation = { ...req.body } as any;
       if (bodyForValidation.story_point !== undefined) {
@@ -190,7 +186,6 @@ export class DesignerController {
       let assignedTo: string | null | undefined;
       if (bodyForValidation.assigned_to_user_id !== undefined) {
         const raw = bodyForValidation.assigned_to_user_id;
-        console.log('[DesignerController.updateTask] Raw assigned_to_user_id:', raw, '| type:', typeof raw);
         if (raw === 'null' || raw === '' || raw === null) {
           assignedTo = null;
         } else if (typeof raw === 'string' && raw.length > 0) {
@@ -199,7 +194,6 @@ export class DesignerController {
           assignedTo = undefined;
         }
       }
-      console.log('[DesignerController.updateTask] Resolved assignedTo:', assignedTo);
       delete bodyForValidation.assigned_to_user_id;
 
       const raw = req.body.attachment_urls;
@@ -226,11 +220,6 @@ export class DesignerController {
         { ...dto, attachment_urls: mergedUrls, assigned_to_user_id: assignedTo },
         req.user
       );
-      console.log('[DesignerController.updateTask] Update service returned successfully');
-      console.log('[DesignerController.updateTask] Response data keys:', Object.keys(task));
-      console.log('[DesignerController.updateTask] Response assigned_to_user_id:', task.assigned_to_user_id);
-      console.log('[DesignerController.updateTask] Response is_public:', task.is_public);
-      console.log('[DesignerController.updateTask] ========== UPDATE TASK COMPLETE ==========');
       res.status(200).json({ success: true, data: task, message: "Designer task updated successfully" });
     } catch (error) {
       next(error);
@@ -271,23 +260,15 @@ export class DesignerController {
 
   async withdrawApplication(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
-      console.log('[DesignerController.withdrawApplication] ========== REQUEST RECEIVED ==========');
-      console.log('[DesignerController.withdrawApplication] Params:', req.params);
-      console.log('[DesignerController.withdrawApplication] User:', req.user ? { id: req.user.id, role: req.user.role } : 'NONE');
-
       if (!req.user) {
-        console.log('[DesignerController.withdrawApplication] ERROR: No authenticated user');
         res.status(401).json({ success: false, message: "Unauthorized" });
         return;
       }
 
       const taskId = req.params.id as string;
-      console.log('[DesignerController.withdrawApplication] Calling service with taskId:', taskId, 'userId:', req.user.id);
       const application = await designerService.withdrawApplication(taskId, req.user.id);
-      console.log('[DesignerController.withdrawApplication] Service returned:', application.id, 'is_withdrawn:', application.is_withdrawn);
       res.status(200).json({ success: true, data: application, message: "Application withdrawn successfully" });
     } catch (error) {
-      console.log('[DesignerController.withdrawApplication] ERROR caught:', (error as any)?.message || error);
       next(error);
     }
   }
@@ -429,7 +410,6 @@ export class DesignerController {
       }
 
       const reviewId = req.params.id as string;
-      console.log("Found review in the controller:", reviewId);
       const dto = await validateDto(UpdateSubmissionReviewDto, req.body, req);
       const review = await designerService.updateSubmissionReview(
         reviewId,
@@ -557,16 +537,7 @@ export class DesignerController {
       const { reason } = (req.body || {}) as { reason?: string };
       const reasonStr = (reason && typeof reason === "string" && reason.trim().length > 0) ? reason.trim() : "Task removed by admin";
 
-      console.log('[DesignerController.removeTask] ========== DELETE TASK REQUEST ==========');
-      console.log('[DesignerController.removeTask] Task ID:', taskId);
-      console.log('[DesignerController.removeTask] User:', { id: req.user.id, role: req.user.role });
-      console.log('[DesignerController.removeTask] Reason:', reasonStr);
-
       const task = await designerService.removeTask(taskId, req.user.id, reasonStr);
-
-      console.log('[DesignerController.removeTask] Service returned successfully');
-      console.log('[DesignerController.removeTask] Task state after removal:', task.task_state);
-      console.log('[DesignerController.removeTask] ========== DELETE TASK COMPLETE ==========');
 
       res.status(200).json({ success: true, data: task, message: "Task removed successfully" });
     } catch (error) {

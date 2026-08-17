@@ -315,13 +315,11 @@ export class MarketingService {
   }
 
   private async batchSubmissionsWithReviews(taskIds: string[], userId: string): Promise<Record<string, any>> {
-    console.log('[MarketingService] batchSubmissionsWithReviews called with taskIds:', taskIds);
     if (taskIds.length === 0) return {};
 
     const submissions = await this.submissionRepo.find({
       where: { marketing_task_id: In(taskIds) },
     });
-    console.log(`[MarketingService] batchSubmissionsWithReviews found ${submissions.length} submissions`);
 
     const allReviews = submissions.length > 0
       ? await this.reviewRepo
@@ -469,7 +467,6 @@ export class MarketingService {
       where: { marketing_task_id: id },
       order: { created_at: "DESC" },
     });
-    console.log(`[MarketingService] findTaskById - found ${submissions.length} submissions for task ${id}`);
 
     const reviewRepo = this.reviewRepo;
     const allReviews = submissions.length > 0
@@ -482,7 +479,6 @@ export class MarketingService {
           })
           .getMany()
       : [];
-    console.log(`[MarketingService] findTaskById - found ${allReviews.length} reviews for task ${id}`);
 
     const reviewsBySubmission: Record<string, any[]> = {};
     for (const r of allReviews) {

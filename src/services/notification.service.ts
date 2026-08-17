@@ -78,13 +78,10 @@ export class NotificationService {
 
       const resourceTypes = config.filters[role];
       if (!resourceTypes || resourceTypes.length === 0) {
-        console.log(`  [getUnreadCounts] Skipping key=${key} — no resource_types for role=${role}`);
         continue;
       }
 
-      console.log(`  [getUnreadCounts] Querying key=${key} parentType=${config.parentType} resourceTypes=[${resourceTypes.join(",")}]`);
-
-      // Fetch distinct parent_ids for logging
+      // Fetch distinct parent_ids
       const parentIds = await this.repo
         .createQueryBuilder("n")
         .select("DISTINCT n.parent_id", "parent_id")
@@ -95,45 +92,26 @@ export class NotificationService {
         .getRawMany();
 
       const ids = parentIds.map((r: any) => r.parent_id);
-      console.log(`  [getUnreadCounts] key=${key} parent_ids=[${ids.join(", ") || "(none)"}] count=${ids.length}`);
 
       results[key] = ids.length;
     }
 
-    console.log(`[getUnreadCounts] Final result:`, JSON.stringify(results));
     return results;
   }
 
   async markRead(notificationId: string, userId: string) {
-  const timestamp = new Date().toISOString();
-  console.log(`[${timestamp}] [markRead] RECEIVED - notificationId: ${notificationId}, userId: ${userId}`);
-  
   const notification = await this.repo.findOne({
     where: { id: notificationId, user_id: userId } as any,
   });
 
   if (!notification) {
-    console.log(`[${timestamp}] [markRead] NOT FOUND - notificationId: ${notificationId}, userId: ${userId}`);
     throw new AppError(404, "Notification not found");
   }
-
-  console.log(`[${timestamp}] [markRead] FOUND - Notification details:`, JSON.stringify({
-    id: notification.id,
-    viewed_before: notification.viewed,
-    user_id: notification.user_id,
-    created_at: notification.created_at
-  }));
 
   notification.viewed = true;
   notification.updated_at = new Date();
   
   const updatedNotification = await this.repo.save(notification);
-  
-  console.log(`[${timestamp}] [markRead] SUCCESS - Updated notification ID: ${notificationId}`, JSON.stringify({
-    id: updatedNotification.id,
-    viewed: updatedNotification.viewed,
-    updated_at: updatedNotification.updated_at
-  }));
   
   return updatedNotification;
 }

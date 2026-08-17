@@ -50,7 +50,6 @@ export class EmailService {
 
     try {
       await transporter.sendMail(mailOptions);
-      console.log(`Password reset email sent to ${to}`);
     } catch (err: any) {
       console.error("Email send failed:", err.message);
       throw new AppError(500, "Unable to send reset email. Please try again later.");

@@ -66,9 +66,8 @@ async function cleanupOldMarketingTables() {
     await cleanupDs.query(`DROP TABLE IF EXISTS paid_customer_review CASCADE`);
     await cleanupDs.query(`DROP TABLE IF EXISTS paid_customer CASCADE`);
     await cleanupDs.query(`DROP TABLE IF EXISTS customer CASCADE`);
-    console.log("Old marketing tables cleaned up");
   } catch (e: any) {
-    console.log("Marketing cleanup (non-fatal):", e.message);
+    // Marketing cleanup is non-fatal
   } finally {
     if (cleanupDs.isInitialized) {
       await cleanupDs.destroy();
@@ -79,10 +78,8 @@ async function cleanupOldMarketingTables() {
 cleanupOldMarketingTables()
   .then(() => AppDataSource.initialize())
   .then(() => {
-    console.log("Database connected successfully");
     app.listen(PORT, () => {
-      console.log(`Server running on port ${PORT}`);
-      console.log(`API available at http://localhost:${PORT}/api/v1`);
+      // Server started
     });
   })
   .catch((error) => {

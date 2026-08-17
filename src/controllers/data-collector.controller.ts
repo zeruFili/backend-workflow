@@ -35,7 +35,6 @@ async function validateDto<T extends object>(dtoClass: new () => T, plain: objec
 export class DataCollectorController {
   async findAllTasks(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
-      console.log("findAllTasks called with query:i have been called ");
       if (!req.user) {
         res.status(401).json({ success: false, message: "Unauthorized" });
         return;
@@ -151,7 +150,6 @@ export class DataCollectorController {
 
   async createSubmission(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
-      console.log("createSubmission called");
       if (!req.user) {
         res.status(401).json({ success: false, message: "Unauthorized" });
         return;
