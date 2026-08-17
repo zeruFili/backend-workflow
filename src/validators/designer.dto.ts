@@ -11,6 +11,10 @@ export class CreateDesignerTaskDto {
   @Length(1, 5000)
   description: string;
 
+  @IsOptional()
+  @IsString()
+  instruction?: string;
+
   @IsInt()
   @Min(1)
   @Max(100)
@@ -44,6 +48,10 @@ export class UpdateDesignerTaskDto {
   @IsString()
   @Length(1, 5000)
   description?: string;
+
+  @IsOptional()
+  @IsString()
+  instruction?: string;
 
   @IsOptional()
   @IsEnum(ReviewOutcome)

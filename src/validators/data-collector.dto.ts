@@ -13,6 +13,10 @@ export class CreateDCTaskDto {
   description: string;
 
   @IsOptional()
+  @IsString()
+  instruction?: string;
+
+  @IsOptional()
   @IsUUID()
   assigned_to_user_id?: string;
 
@@ -36,6 +40,10 @@ export class UpdateDCTaskDto {
   @IsString()
   @Length(1, 5000)
   description?: string;
+
+  @IsOptional()
+  @IsString()
+  instruction?: string;
 
   @IsOptional()
   @IsEnum(DataCollectorTaskStatus)

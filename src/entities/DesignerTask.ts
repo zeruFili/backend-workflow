@@ -33,6 +33,9 @@ export class DesignerTask {
   @Column({ type: "text" })
   description: string;
 
+  @Column({ type: "text", nullable: true })
+  instruction: string | null;
+
   @Column({ type: "enum", enum: ReviewOutcome, nullable: true, default: ReviewOutcome.PENDING })
   status: ReviewOutcome;
 

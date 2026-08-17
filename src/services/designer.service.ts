@@ -34,6 +34,7 @@ interface PaginatedParams {
 interface CreateTaskParams {
   title: string;
   description: string;
+  instruction?: string;
   story_point: number;
   is_public?: boolean;
   due_date?: string;
@@ -44,6 +45,7 @@ interface CreateTaskParams {
 interface UpdateTaskParams {
   title?: string;
   description?: string;
+  instruction?: string;
   status?: ReviewOutcome;
   stage?: DesignerStage;
   is_public?: boolean;
@@ -710,6 +712,7 @@ export class DesignerService {
     const task = new DesignerTask();
     task.title = params.title;
     task.description = params.description;
+    task.instruction = (params.instruction ?? null) as any;
     task.assigned_by_user_id = assignedByUserId;
     task.assigned_to_user_id = (params.assigned_to_user_id ?? null) as any;
     task.story_point = params.story_point;
@@ -802,6 +805,7 @@ export class DesignerService {
 
     if (params.title !== undefined) { task.title = params.title; }
     if (params.description !== undefined) { task.description = params.description; }
+    if (params.instruction !== undefined) { task.instruction = params.instruction as any; }
     if (params.status !== undefined) { task.status = params.status; }
     if (params.stage !== undefined) { task.stage = params.stage; }
     if (params.is_public !== undefined) { task.is_public = params.is_public; }

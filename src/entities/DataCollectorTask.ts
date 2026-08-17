@@ -32,6 +32,9 @@ export class DataCollectorTask {
   @Column({ type: "text" })
   description: string;
 
+  @Column({ type: "text", nullable: true })
+  instruction: string | null;
+
   @Column({ type: "enum", enum: DataCollectorTaskStatus, nullable: true, default: DataCollectorTaskStatus.PENDING })
   status: DataCollectorTaskStatus;
 
